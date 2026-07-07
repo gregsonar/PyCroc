@@ -429,12 +429,12 @@ class ConfigStore:
 - Create: `.pre-commit-config.yaml`, `ruff.toml` (или секция в `pyproject.toml`), `pytest.ini`
 - Create: `README.md` (заглушка), `.gitignore`
 
-- [ ] настроить `pyproject.toml` (hatchling backend, зависимости: `textual`, `qrcode`,
+- [x] настроить `pyproject.toml` (hatchling backend, зависимости: `textual`, `qrcode`,
       `tomlkit`, `platformdirs`; dev-зависимости: `pytest`, `pytest-asyncio`, `ruff`, `mypy`)
-- [ ] добавить entry point `pycroc = pycroc.ui.app:main` в `[project.scripts]`
-- [ ] настроить `ruff` (line-length, правила) и `mypy --strict` для `src/`
-- [ ] добавить `pytest-asyncio` в режиме `asyncio_mode = "auto"`
-- [ ] запустить `ruff check .` и `mypy src` — оба должны проходить на пустом каркасе
+- [x] добавить entry point `pycroc = pycroc.ui.app:main` в `[project.scripts]`
+- [x] настроить `ruff` (line-length, правила) и `mypy --strict` для `src/`
+- [x] добавить `pytest-asyncio` в режиме `asyncio_mode = "auto"`
+- [x] запустить `ruff check .` и `mypy src` — оба должны проходить на пустом каркасе
 
 *Note: реальный `croc`-бинарник в CI недоступен — все интеграционные тесты используют
 подставной скрипт-заглушку (см. Task 3), а не настоящий croc.*
@@ -445,14 +445,14 @@ class ConfigStore:
 - Create: `src/pycroc/core/options.py`
 - Create: `tests/core/test_options.py`
 
-- [ ] реализовать dataclass `CrocOptions` со всеми полями из Technical Details
-- [ ] реализовать `build_send_args(opts, files) -> list[str]`
-- [ ] реализовать `build_receive_args(opts, code) -> list[str]`
-- [ ] обработать пустые строки полей формы как `None` (нормализация на границе UI, не здесь —
+- [x] реализовать dataclass `CrocOptions` со всеми полями из Technical Details
+- [x] реализовать `build_send_args(opts, files) -> list[str]`
+- [x] реализовать `build_receive_args(opts, code) -> list[str]`
+- [x] обработать пустые строки полей формы как `None` (нормализация на границе UI, не здесь —
       здесь входные данные уже нормализованы; добавить явный docstring с этим контрактом)
-- [ ] добавить тесты: сборка `--exclude` через запятую, `--yes` при `auto_accept`, round-trip
+- [x] добавить тесты: сборка `--exclude` через запятую, `--yes` при `auto_accept`, round-trip
       через тестовый argparse-парсер
-- [ ] запустить `pytest tests/core/test_options.py -q` — должен пройти перед Task 3
+- [x] запустить `pytest tests/core/test_options.py -q` — должен пройти перед Task 3
 
 ### Task 3: Парсер строк вывода croc
 
