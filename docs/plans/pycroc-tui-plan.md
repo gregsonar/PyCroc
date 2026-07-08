@@ -462,18 +462,18 @@ class ConfigStore:
 - Create: `tests/core/test_parser.py`
 - Create: `tests/fixtures/croc_stderr_samples.txt` (реальные захваченные строки вывода)
 
-- [ ] определить dataclasses событий: `CodeEvent`, `TransferStartEvent`, `ProgressEvent`,
+- [x] определить dataclasses событий: `CodeEvent`, `TransferStartEvent`, `ProgressEvent`,
       `AcceptPromptEvent`, `ErrorEvent`, `DoneEvent`
-- [ ] реализовать regex-паттерны из Technical Details (`CODE_RE`, `SENDING_INIT_RE`,
+- [x] реализовать regex-паттерны из Technical Details (`CODE_RE`, `SENDING_INIT_RE`,
       `ACCEPT_PROMPT_RE`, `PROGRESS_RE`)
-- [ ] реализовать `parse_line(line: str) -> Event | None` с fallback на `None` для
+- [x] реализовать `parse_line(line: str) -> Event | None` с fallback на `None` для
       нераспознанных строк (без исключений)
-- [ ] реализовать буферизацию по `\r`/`\n` в отдельной функции `split_stream_chunks()`
+- [x] реализовать буферизацию по `\r`/`\n` в отдельной функции `split_stream_chunks()`
       для корректной обработки перезаписываемых прогресс-строк (см. граничный случай в
       Technical Details) — покрыть тестом с сырыми байтами, где нет `\n` до конца передачи
-- [ ] добавить тесты на все примеры из `croc_stderr_samples.txt`, включая мультифайловую
+- [x] добавить тесты на все примеры из `croc_stderr_samples.txt`, включая мультифайловую
       передачу (несколько разных `filename` подряд) и строку с ошибкой
-- [ ] запустить `pytest tests/core/test_parser.py -q` — критический гейт, самый важный тест
+- [x] запустить `pytest tests/core/test_parser.py -q` — критический гейт, самый важный тест
       в проекте (см. Testing Strategy) — должен пройти перед Task 4
 
 ### Task 4: `CrocRunner` — subprocess-обёртка

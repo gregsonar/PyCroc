@@ -1,0 +1,15 @@
+Sending 'file.txt' (116 B)
+Code is: slow-tomato-almond
+On the other computer run
+
+croc slow-tomato-almond
+Sending (->192.168.225.37:9009) file.txt   0% |                    | (0/116 B, 0 B/s) [0s:0s]
+Sending (->192.168.225.37:9009) file.txt  50% |██████████          | (58/116 B, 1.2 kB/s) [0s:0s]
+Sending (->192.168.225.37:9009) file.txt 100% |████████████████████| (116/116 B, 32.966 kB/s) [0s:0s] ✔️
+Accept 'file.txt' (116 B)? (y/n)
+Receiving (<-192.168.225.37:9009) file.txt 100% |████████████████████| (116/116 B, 32.966 kB/s) [0s:0s] ✔️
+Receiving (<-10.0.0.2:9009) IMG_0001.jpg 100% |████████████████████| (2.1/2.1 MB, 8.4 MB/s) [1s:0s] ✔️
+Receiving (<-10.0.0.2:9009) IMG_0002.jpg  47% |█████████           | (1.0/2.1 MB, 7.9 MB/s) [0s:1s]
+Error: could not connect to relay
+failed to connect: dial tcp 192.168.225.37:9009: i/o timeout
+some future unknown croc output format
