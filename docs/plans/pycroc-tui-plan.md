@@ -484,18 +484,18 @@ class ConfigStore:
 - Create: `tests/core/test_runner.py`
 - Create: `tests/fixtures/fake_croc.py` (Python-скрипт-заглушка, эмулирующий поведение croc)
 
-- [ ] реализовать `fake_croc.py`, принимающий аргументы командной строки и печатающий в
+- [x] реализовать `fake_croc.py`, принимающий аргументы командной строки и печатающий в
       stderr заранее заданный сценарий строк с настраиваемыми задержками (через env-переменную
       с путём к JSON-сценарию)
-- [ ] реализовать `CrocRunner.check_binary()` (вызов `<binary> --version`, парсинг версии)
-- [ ] реализовать `CrocRunner.send()` как async-генератор поверх `asyncio.create_subprocess_exec`
-- [ ] реализовать `CrocRunner.receive()` аналогично
-- [ ] реализовать автоответ `y\n`/`n\n` в stdin на `AcceptPromptEvent` согласно `opts.auto_accept`
-- [ ] реализовать `CrocRunner.cancel()` (`proc.terminate()` с таймаутом, затем `kill()`)
-- [ ] реализовать защиту от параллельного запуска (`TransferInProgressError`)
-- [ ] добавить тесты: успешный сценарий, сценарий с ошибкой, отмена во время передачи,
+- [x] реализовать `CrocRunner.check_binary()` (вызов `<binary> --version`, парсинг версии)
+- [x] реализовать `CrocRunner.send()` как async-генератор поверх `asyncio.create_subprocess_exec`
+- [x] реализовать `CrocRunner.receive()` аналогично
+- [x] реализовать автоответ `y\n`/`n\n` в stdin на `AcceptPromptEvent` согласно `opts.auto_accept`
+- [x] реализовать `CrocRunner.cancel()` (`proc.terminate()` с таймаутом, затем `kill()`)
+- [x] реализовать защиту от параллельного запуска (`TransferInProgressError`)
+- [x] добавить тесты: успешный сценарий, сценарий с ошибкой, отмена во время передачи,
       попытка параллельного запуска, отсутствие бинарника
-- [ ] запустить `pytest tests/core/test_runner.py -q` — должен пройти перед Task 5
+- [x] запустить `pytest tests/core/test_runner.py -q` — должен пройти перед Task 5
 
 ### Task 5: Хранилище истории (SQLite)
 
