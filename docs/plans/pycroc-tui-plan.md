@@ -503,12 +503,12 @@ class ConfigStore:
 - Create: `src/pycroc/storage/history.py`
 - Create: `tests/storage/test_history.py`
 
-- [ ] определить dataclass `TransferRecord`
-- [ ] реализовать `HistoryRepository` с ленивой инициализацией схемы (`CREATE TABLE IF NOT EXISTS`)
-- [ ] реализовать `add`, `list` (с фильтром по `query`), `delete` через `asyncio.to_thread`
+- [x] определить dataclass `TransferRecord`
+- [x] реализовать `HistoryRepository` с ленивой инициализацией схемы (`CREATE TABLE IF NOT EXISTS`)
+- [x] реализовать `add`, `list` (с фильтром по `query`), `delete` через `asyncio.to_thread`
       поверх `sqlite3`
-- [ ] добавить тесты: add+list, поиск по подстроке имени файла, idempotent delete
-- [ ] запустить `pytest tests/storage/test_history.py -q`
+- [x] добавить тесты: add+list, поиск по подстроке имени файла, idempotent delete
+- [x] запустить `pytest tests/storage/test_history.py -q`
 
 ### Task 6: Хранилище конфигурации и профилей (TOML)
 
