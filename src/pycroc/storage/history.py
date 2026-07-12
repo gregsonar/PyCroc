@@ -108,19 +108,23 @@ class HistoryRepository:
 
     # builtins.list: в области видимости класса имя list — это метод выше
     def _list_sync(self, limit: int, query: str | None) -> builtins.list[TransferRecord]:
-        sql = "SELECT * FROM transfers"
-        params: list[object] = []
-        if query:
-            # LIKE в SQLite регистронезависим для ASCII; % и _ экранируются,
-            # чтобы подстрока из формы поиска трактовалась буквально
-            escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-            sql += " WHERE filename LIKE ? ESCAPE '\\'"
-            params.append(f"%{escaped}%")
-        sql += " ORDER BY started_at DESC, id DESC LIMIT ?"
-        params.append(limit)
+        sql = "SELECT * FROM transfers ORDER BY started_at DESC, id DESC"
         with closing(self._connect()) as conn:
-            rows = conn.execute(sql, params).fetchall()
-        return [self._row_to_record(row) for row in rows]
+            if not query:
+                rows = conn.execute(f"{sql} LIMIT ?", (limit,)).fetchall()
+                return [self._row_to_record(row) for row in rows]
+            # Фильтр по подстроке — на стороне Python: LIKE/lower() в SQLite
+            # регистронезависимы только для ASCII, а имена файлов могут быть
+            # кириллицей, умляутами и т.д. casefold() корректен для Unicode.
+            rows = conn.execute(sql).fetchall()
+        needle = query.casefold()
+        records: builtins.list[TransferRecord] = []
+        for row in rows:
+            if needle in row["filename"].casefold():
+                records.append(self._row_to_record(row))
+                if len(records) >= limit:
+                    break
+        return records
 
     def _delete_sync(self, record_id: int) -> None:
         with closing(self._connect()) as conn, conn:

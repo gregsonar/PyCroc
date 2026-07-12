@@ -56,13 +56,27 @@ async def test_list_query_filters_filename_case_insensitively(tmp_path: Path) ->
     assert await repo.list(query="нет-такого-файла") == []
 
 
-async def test_list_query_treats_like_wildcards_literally(tmp_path: Path) -> None:
+async def test_list_query_treats_sql_wildcard_chars_literally(tmp_path: Path) -> None:
     repo = HistoryRepository(tmp_path / "history.db")
     await repo.add(_record(filename="100%_done.txt"))
     await repo.add(_record(filename="100x-done.txt"))
 
     found = await repo.list(query="100%_")
     assert [r.filename for r in found] == ["100%_done.txt"]
+
+
+async def test_list_query_is_case_insensitive_for_non_ascii(tmp_path: Path) -> None:
+    repo = HistoryRepository(tmp_path / "history.db")
+    await repo.add(_record(filename="Отчёт-Июль.pdf"))
+    await repo.add(_record(filename="Straße-Plan.pdf"))
+    await repo.add(_record(filename="年度报告.pdf"))
+    await repo.add(_record(filename="unrelated.txt"))
+
+    assert [r.filename for r in await repo.list(query="отчёт")] == ["Отчёт-Июль.pdf"]
+    assert [r.filename for r in await repo.list(query="ОТЧЁТ-и")] == ["Отчёт-Июль.pdf"]
+    # casefold: ß эквивалентно ss
+    assert [r.filename for r in await repo.list(query="STRASSE")] == ["Straße-Plan.pdf"]
+    assert [r.filename for r in await repo.list(query="报告")] == ["年度报告.pdf"]
 
 
 async def test_list_orders_newest_first_and_respects_limit(tmp_path: Path) -> None:
