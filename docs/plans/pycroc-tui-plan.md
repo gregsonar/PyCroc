@@ -548,11 +548,11 @@ class ConfigStore:
 - Create: `src/pycroc/ui/widgets/qr_code.py`
 - Create: `tests/ui/widgets/test_qr_code.py`
 
-- [ ] реализовать генерацию ASCII-QR из строки кода через `qrcode.QRCode` + `print_ascii`
+- [x] реализовать генерацию ASCII-QR из строки кода через `qrcode.QRCode` + `print_ascii`
       в буфер, рендер как `Static` содержимое
-- [ ] сделать `code` реактивным свойством, обновляющим QR при изменении
-- [ ] добавить тест: установка `widget.code = "slow-tomato-almond"` меняет отрендеренный текст
-- [ ] запустить `pytest tests/ui/widgets/test_qr_code.py -q`
+- [x] сделать `code` реактивным свойством, обновляющим QR при изменении
+- [x] добавить тест: установка `widget.code = "slow-tomato-almond"` меняет отрендеренный текст
+- [x] запустить `pytest tests/ui/widgets/test_qr_code.py -q`
 
 ### Task 9: `SendPanel`
 

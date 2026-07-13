@@ -23,6 +23,7 @@ dev = [
     "pytest-asyncio>=0.23",
     "ruff>=0.6",
     "mypy>=1.10",
+    "types-qrcode",
 ]
 
 [project.scripts]
