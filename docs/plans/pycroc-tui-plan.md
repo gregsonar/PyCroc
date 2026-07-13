@@ -516,14 +516,14 @@ class ConfigStore:
 - Create: `src/pycroc/storage/config.py`
 - Create: `tests/storage/test_config.py`
 
-- [ ] реализовать `Profile` dataclass и сериализацию `CrocOptions <-> TOML` (включая
+- [x] реализовать `Profile` dataclass и сериализацию `CrocOptions <-> TOML` (включая
       `exclude: tuple[str, ...] <-> TOML-массив`)
-- [ ] реализовать `ConfigStore` с путём через `platformdirs.user_config_dir("pycroc")`
-- [ ] реализовать защиту профиля `"default"` от удаления
-- [ ] реализовать fallback на профиль по умолчанию при повреждённом файле конфигурации
-- [ ] добавить тесты: save+load round-trip, защита `default`, восстановление после
+- [x] реализовать `ConfigStore` с путём через `platformdirs.user_config_dir("pycroc")`
+- [x] реализовать защиту профиля `"default"` от удаления
+- [x] реализовать fallback на профиль по умолчанию при повреждённом файле конфигурации
+- [x] добавить тесты: save+load round-trip, защита `default`, восстановление после
       повреждённого TOML
-- [ ] запустить `pytest tests/storage/test_config.py -q`
+- [x] запустить `pytest tests/storage/test_config.py -q`
 
 ### Task 7: Каркас Textual-приложения
 
