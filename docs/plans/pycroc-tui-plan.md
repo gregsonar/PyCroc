@@ -596,13 +596,14 @@ class ConfigStore:
 - Create: `src/pycroc/ui/widgets/history_panel.py`
 - Create: `tests/ui/widgets/test_history_panel.py`
 
-- [ ] реализовать `DataTable`, привязанный к `HistoryRepository.list()`
-- [ ] реализовать поле поиска с debounce, вызывающее `list(query=...)`
-- [ ] реализовать действия по строке: "повторить передачу" (переключает на Send/Receive
+- [x] реализовать `DataTable`, привязанный к `HistoryRepository.list()`
+- [x] реализовать поле поиска с debounce, вызывающее `list(query=...)`
+- [x] реализовать действия по строке: "повторить передачу" (переключает на Send/Receive
       с предзаполненными полями), "скопировать код", "удалить запись"
-- [ ] добавить Pilot-тесты: поиск фильтрует таблицу, "удалить" вызывает
+      *(переключение вкладок — через message `RepeatTransfer`, обрабатывается в Task 13)*
+- [x] добавить Pilot-тесты: поиск фильтрует таблицу, "удалить" вызывает
       `HistoryRepository.delete` и убирает строку
-- [ ] запустить `pytest tests/ui/widgets/test_history_panel.py -q`
+- [x] запустить `pytest tests/ui/widgets/test_history_panel.py -q`
 
 ### Task 12: `SettingsPanel` и профили
 
