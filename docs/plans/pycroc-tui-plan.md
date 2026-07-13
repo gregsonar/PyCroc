@@ -579,15 +579,16 @@ class ConfigStore:
 - Create: `src/pycroc/ui/widgets/overwrite_modal.py`
 - Create: `tests/ui/widgets/test_receive_panel.py`
 
-- [ ] реализовать поле ввода кода с автодополнением из истории + избранного
-- [ ] реализовать выбор папки назначения (`--out`)
-- [ ] реализовать `action_receive()` аналогично `SendPanel.action_send()`
-- [ ] реализовать `OverwriteConflictModal` (`ModalScreen`), открывается на
+- [x] реализовать поле ввода кода с автодополнением из истории + избранного
+      *(решение 2026-07-13: только из истории — хранилище избранного планом не предусмотрено)*
+- [x] реализовать выбор папки назначения (`--out`)
+- [x] реализовать `action_receive()` аналогично `SendPanel.action_send()`
+- [x] реализовать `OverwriteConflictModal` (`ModalScreen`), открывается на
       `AcceptPromptEvent` при `auto_accept=False`, пишет ответ в stdin активного процесса
       через `CrocRunner`
-- [ ] добавить Pilot-тесты: ввод кода запускает `croc_runner.receive` с этим кодом,
+- [x] добавить Pilot-тесты: ввод кода запускает `croc_runner.receive` с этим кодом,
       `AcceptPromptEvent` открывает модалку, выбор "Нет" отправляет `n\n`
-- [ ] запустить `pytest tests/ui/widgets/test_receive_panel.py -q`
+- [x] запустить `pytest tests/ui/widgets/test_receive_panel.py -q`
 
 ### Task 11: `HistoryPanel`
 
