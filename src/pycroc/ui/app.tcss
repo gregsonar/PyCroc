@@ -1,0 +1,12 @@
+/* Базовая тема PyCroc: пока только заглушки вкладок (Task 7).
+   Стили реальных панелей добавляются вместе с ними в Task 9–12. */
+
+TabPane {
+    padding: 1 2;
+}
+
+.placeholder {
+    padding: 2 4;
+    color: $text-muted;
+    text-style: italic;
+}

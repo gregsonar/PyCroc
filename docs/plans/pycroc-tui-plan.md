@@ -532,15 +532,15 @@ class ConfigStore:
 - Create: `src/pycroc/ui/app.tcss`
 - Create: `tests/ui/test_app.py`
 
-- [ ] реализовать `PyCrocApp(App)` с `TabbedContent` из четырёх пустых вкладок-заглушек
-- [ ] в `on_mount` создать единственные экземпляры `CrocRunner`, `HistoryRepository`,
+- [x] реализовать `PyCrocApp(App)` с `TabbedContent` из четырёх пустых вкладок-заглушек
+- [x] в `on_mount` создать единственные экземпляры `CrocRunner`, `HistoryRepository`,
       `ConfigStore`, вызвать `check_binary()` и показать предупреждение через `self.notify()`
       при отсутствии croc (без падения приложения)
-- [ ] добавить базовую тему `app.tcss` (согласно `frontend-design`, если стилизация UI
+- [x] добавить базовую тему `app.tcss` (согласно `frontend-design`, если стилизация UI
       выходит за рамки стандартных виджетов Textual)
-- [ ] добавить Pilot-тест: приложение стартует, четыре вкладки видны, `pycroc` без
+- [x] добавить Pilot-тест: приложение стартует, четыре вкладки видны, `pycroc` без
       установленного `croc` показывает предупреждение, а не падает
-- [ ] запустить `pytest tests/ui/test_app.py -q`
+- [x] запустить `pytest tests/ui/test_app.py -q`
 
 ### Task 8: `QrCodeWidget`
 
