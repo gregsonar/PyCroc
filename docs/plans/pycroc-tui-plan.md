@@ -561,16 +561,16 @@ class ConfigStore:
 - Create: `src/pycroc/ui/widgets/file_picker.py` (multi-select на базе `DirectoryTree`)
 - Create: `tests/ui/widgets/test_send_panel.py`
 
-- [ ] реализовать `file_picker.py`: `DirectoryTree` с чекбоксами, метод `selected_paths()`
-- [ ] реализовать форму опций `SendPanel` (поля, соответствующие `CrocOptions`), с значениями
+- [x] реализовать `file_picker.py`: `DirectoryTree` с чекбоксами, метод `selected_paths()`
+- [x] реализовать форму опций `SendPanel` (поля, соответствующие `CrocOptions`), с значениями
       по умолчанию из активного профиля `ConfigStore`
-- [ ] реализовать `action_send()`: сборка `CrocOptions`, запуск `run_worker` с
+- [x] реализовать `action_send()`: сборка `CrocOptions`, запуск `run_worker` с
       `croc_runner.send(...)`, обработка событий (`CodeEvent` -> `QrCodeWidget`,
       `ProgressEvent` -> `ProgressBar`, `DoneEvent`/`ErrorEvent` -> запись в `HistoryRepository`)
-- [ ] реализовать кнопку отмены передачи (`croc_runner.cancel()`)
-- [ ] добавить Pilot-тесты: mock `CrocRunner`, проверка обновления прогресс-бара и QR по
+- [x] реализовать кнопку отмены передачи (`croc_runner.cancel()`)
+- [x] добавить Pilot-тесты: mock `CrocRunner`, проверка обновления прогресс-бара и QR по
       синтетическим событиям, проверка вызова `HistoryRepository.add` по завершении
-- [ ] запустить `pytest tests/ui/widgets/test_send_panel.py -q`
+- [x] запустить `pytest tests/ui/widgets/test_send_panel.py -q`
 
 ### Task 10: `ReceivePanel` и `OverwriteConflictModal`
 
