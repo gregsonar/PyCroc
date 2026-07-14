@@ -44,14 +44,22 @@ class CrocRunner:
     """
 
     def __init__(self, binary_path: str = "croc") -> None:
+        self._proc: asyncio.subprocess.Process | None = None
+        self._running = False
+        self._cancel_requested = False
+        self.set_binary(binary_path)
+
+    def set_binary(self, binary_path: str) -> None:
+        """Смена пути к бинарнику (после проверки в Settings).
+
+        На уже запущенную передачу не влияет — команда читается при старте
+        следующего процесса.
+        """
         self._binary_path = binary_path
         if binary_path.endswith(".py"):
             self._command: tuple[str, ...] = (sys.executable, binary_path)
         else:
             self._command = (binary_path,)
-        self._proc: asyncio.subprocess.Process | None = None
-        self._running = False
-        self._cancel_requested = False
 
     async def send(self, paths: list[str], options: CrocOptions) -> AsyncIterator[Event]:
         """Отправка файлов/папок; события по мере разбора stderr."""

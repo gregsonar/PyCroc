@@ -1,4 +1,5 @@
-"""Pilot-тесты каркаса приложения (Task 7)."""
+"""Pilot-тесты каркаса приложения (Task 7; обновлены в Task 13:
+отсутствие croc теперь блокирует вкладки Send/Receive)."""
 
 from __future__ import annotations
 
@@ -17,7 +18,11 @@ MISSING_BINARY = "definitely-missing-croc-binary-xyz"
 def _app(tmp_path: Path, binary: str) -> PyCrocApp:
     config = ConfigStore(tmp_path / "config.toml")
     config.set_binary_path(binary)
-    return PyCrocApp(config=config, history=HistoryRepository(tmp_path / "history.db"))
+    return PyCrocApp(
+        config=config,
+        history=HistoryRepository(tmp_path / "history.db"),
+        send_start_path=tmp_path,
+    )
 
 
 def _notification_messages(app: PyCrocApp) -> list[str]:
@@ -25,8 +30,9 @@ def _notification_messages(app: PyCrocApp) -> list[str]:
 
 
 async def test_app_starts_with_four_tabs(tmp_path: Path) -> None:
-    app = _app(tmp_path, MISSING_BINARY)
-    async with app.run_test():
+    app = _app(tmp_path, FAKE_CROC)
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
         assert [pane.id for pane in app.query(TabPane)] == [
             "send",
             "receive",
@@ -36,21 +42,28 @@ async def test_app_starts_with_four_tabs(tmp_path: Path) -> None:
         assert app.query_one(TabbedContent).active == "send"
 
 
-async def test_missing_croc_warns_instead_of_crashing(tmp_path: Path) -> None:
+async def test_missing_croc_warns_and_disables_transfer_tabs(tmp_path: Path) -> None:
     app = _app(tmp_path, MISSING_BINARY)
-    async with app.run_test() as pilot:
+    async with app.run_test(size=(120, 40)) as pilot:
         await pilot.pause()
         assert app.croc_version is None
         assert any("croc" in message for message in _notification_messages(app))
+        tabbed = app.query_one(TabbedContent)
+        assert tabbed.get_tab("send").disabled is True
+        assert tabbed.get_tab("receive").disabled is True
+        assert tabbed.active == "settings"
         assert app.is_running
 
 
 async def test_binary_version_detected_via_fake_croc(tmp_path: Path) -> None:
     app = _app(tmp_path, FAKE_CROC)
-    async with app.run_test() as pilot:
+    async with app.run_test(size=(120, 40)) as pilot:
         await pilot.pause()
         assert app.croc_version == "v10.0.0-fake"
         assert not any("не найден" in message for message in _notification_messages(app))
+        tabbed = app.query_one(TabbedContent)
+        assert tabbed.get_tab("send").disabled is False
+        assert tabbed.get_tab("receive").disabled is False
 
 
 async def test_corrupted_config_warns_and_app_survives(tmp_path: Path) -> None:
@@ -58,8 +71,9 @@ async def test_corrupted_config_warns_and_app_survives(tmp_path: Path) -> None:
     app = PyCrocApp(
         config=ConfigStore(tmp_path / "config.toml"),
         history=HistoryRepository(tmp_path / "history.db"),
+        send_start_path=tmp_path,
     )
-    async with app.run_test() as pilot:
+    async with app.run_test(size=(120, 40)) as pilot:
         await pilot.pause()
         assert any("повреждён" in message for message in _notification_messages(app))
         assert app.is_running

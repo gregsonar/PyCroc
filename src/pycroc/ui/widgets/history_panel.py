@@ -105,6 +105,12 @@ class HistoryPanel(Vertical):
             )
             self._records[key] = record
 
+    def on_show(self) -> None:
+        """Вкладка стала видимой — перечитать историю (могли пройти передачи)."""
+        self.ops_worker = self.run_worker(
+            self.refresh_table(), exclusive=True, group="history-ops"
+        )
+
     def _selected_record(self) -> TransferRecord | None:
         table = self.query_one(DataTable)
         if table.row_count == 0:

@@ -625,13 +625,13 @@ class ConfigStore:
 - Modify: `src/pycroc/ui/app.py`
 - Create: `tests/ui/test_integration_flow.py`
 
-- [ ] заменить вкладки-заглушки из Task 7 на реальные `SendPanel`/`ReceivePanel`/
+- [x] заменить вкладки-заглушки из Task 7 на реальные `SendPanel`/`ReceivePanel`/
       `HistoryPanel`/`SettingsPanel` с инжекцией общих зависимостей
-- [ ] реализовать сквозные уведомления об ошибках через `self.notify(..., severity="error")`
+- [x] реализовать сквозные уведомления об ошибках через `self.notify(..., severity="error")`
       на любом `ErrorEvent`, независимо от вкладки
-- [ ] добавить end-to-end Pilot-тест с mock `CrocRunner`: полный цикл "заполнить форму Send"
+- [x] добавить end-to-end Pilot-тест с mock `CrocRunner`: полный цикл "заполнить форму Send"
       → "получить синтетический DoneEvent" → "открыть History" → "запись видна в таблице"
-- [ ] запустить `pytest tests/ui -q`
+- [x] запустить `pytest tests/ui -q`
 
 ### Task 14: Проверка acceptance-критериев
 

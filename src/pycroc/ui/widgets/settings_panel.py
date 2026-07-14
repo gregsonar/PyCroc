@@ -16,6 +16,7 @@ from collections.abc import Callable
 from textual import on
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.message import Message
 from textual.widgets import Button, Input, Label, OptionList
 from textual.widgets.option_list import Option
 from textual.worker import Worker
@@ -63,6 +64,18 @@ class SettingsPanel(Vertical):
         text-style: bold;
     }
     """
+
+    class BinaryVerified(Message):
+        """Проверка бинарника прошла успешно, путь сохранён в конфиг.
+
+        ``PyCrocApp`` по этому сообщению переключает раннер на новый путь
+        и разблокирует вкладки Send/Receive (Task 13).
+        """
+
+        def __init__(self, path: str, version: str) -> None:
+            super().__init__()
+            self.path = path
+            self.version = version
 
     def __init__(
         self,
@@ -195,3 +208,4 @@ class SettingsPanel(Vertical):
             return
         self._config.set_binary_path(path)
         status.update(f"croc {version} — путь сохранён")
+        self.post_message(self.BinaryVerified(path, version))
