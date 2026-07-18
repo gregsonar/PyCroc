@@ -51,6 +51,35 @@ def test_accept_prompt_line() -> None:
     )
 
 
+def test_v10_progress_line_without_rate() -> None:
+    event = parse_line("payload.bin   0% |                    | ( 0 B/524 kB) [0s:0s]")
+    assert event == ProgressEvent(direction="", filename="payload.bin", percent=0, rate="")
+
+
+def test_v10_progress_line_with_rate_and_no_elapsed() -> None:
+    event = parse_line("payload.bin 100% |████████████████████| (524/524 kB, 131 MB/s)")
+    assert event == ProgressEvent(
+        direction="", filename="payload.bin", percent=100, rate="131 MB/s"
+    )
+
+
+def test_v10_receiver_progress_has_leading_space() -> None:
+    # приёмник v10 печатает прогресс с ведущим пробелом
+    event = parse_line(" payload.bin  47% |█████     | ( 246 kB/524 kB) [0s:1s]")
+    assert event == ProgressEvent(direction="", filename="payload.bin", percent=47, rate="")
+
+
+def test_v10_receiving_init_line() -> None:
+    assert parse_line("Receiving 'payload.bin' (512.0 kB) ") == TransferStartEvent(
+        filename="payload.bin", size="512.0 kB"
+    )
+
+
+def test_v10_direction_only_lines_are_unrecognized() -> None:
+    assert parse_line("Sending (->10.8.1.1:42767)") is None
+    assert parse_line("Receiving (<-127.0.0.1:42731)") is None
+
+
 def test_error_lines() -> None:
     assert parse_line("Error: could not connect to relay") == ErrorEvent(
         message="Error: could not connect to relay"
@@ -100,6 +129,13 @@ def test_fixture_corpus_event_sequence() -> None:
         ErrorEvent,
         ErrorEvent,
         None,  # неизвестный будущий формат
+        # --- реальный захват croc v10.2.7 (Task 14) ---
+        None,  # Sending 0 files (512.0 kB) — без кавычек, не стартовая строка
+        TransferStartEvent,  # Receiving 'payload.bin' (512.0 kB)
+        None,  # Sending (->10.8.1.1:42767) — направление отдельной строкой
+        None,  # Receiving (<-127.0.0.1:42731)
+        ProgressEvent,  # v10: 0%, без скорости
+        ProgressEvent,  # v10: 100%, со скоростью, без [0s:0s]
     ]
     assert len(lines) == len(expected), "фикстура и список ожиданий рассинхронизированы"
     got = [type(e) if (e := parse_line(line)) is not None else None for line in lines]

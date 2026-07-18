@@ -23,7 +23,7 @@ class CrocOptions:
     ``code``, ``exclude``, ``transfers`` — только send; ``out_dir`` — только receive.
     """
 
-    code: str | None = None
+    code: str | None = None  # --code (только send)
     pass_: str | None = None  # --pass
     relay: str | None = None  # --relay
     relay6: str | None = None  # --relay6
@@ -31,8 +31,8 @@ class CrocOptions:
     socks5: str | None = None  # --socks5
     connect: str | None = None  # --connect (http-proxy)
     throttle_upload: str | None = None  # --throttleUpload, напр. "500k"
-    curve: str | None = None  # P-256 | P-348 | P-521 | SIEC
-    hash_algo: str | None = None  # xxhash | imohash
+    curve: str | None = None  # p256 | p384 | p521 | siec | ed25519 (croc v10)
+    hash_algo: str | None = None  # xxhash | imohash | md5 (только send)
     no_compress: bool = False
     ask: bool = False
     auto_accept: bool = True  # управляет --yes И реакцией на AcceptPromptEvent
@@ -52,8 +52,14 @@ def normalize_text(value: str | None) -> str | None:
     return stripped if stripped else None
 
 
-def _common_args(opts: CrocOptions) -> list[str]:
-    """Флаги, общие для send и receive."""
+def _global_args(opts: CrocOptions) -> list[str]:
+    """Глобальные флаги croc.
+
+    ВАЖНО (проверено на реальном croc v10.2.7, Task 14): формат CLI —
+    ``croc [GLOBAL OPTIONS] [COMMAND] [COMMAND OPTIONS] [files]``.
+    Глобальный флаг, поставленный ПОСЛЕ подкоманды ``send``, валит процесс
+    с usage в stdout и пустым stderr.
+    """
     args: list[str] = []
     if opts.auto_accept:
         args.append("--yes")
@@ -69,7 +75,6 @@ def _common_args(opts: CrocOptions) -> list[str]:
         ("--connect", opts.connect),
         ("--throttleUpload", opts.throttle_upload),
         ("--curve", opts.curve),
-        ("--hash", opts.hash_algo),
     )
     for flag, value in value_flags:
         if value is not None:
@@ -80,13 +85,22 @@ def _common_args(opts: CrocOptions) -> list[str]:
 def build_send_args(opts: CrocOptions, paths: Sequence[str]) -> list[str]:
     """Полный хвост argv для отправки: ``croc <результат>``.
 
-    Возвращает ``["send", <флаги...>, <paths...>]``. Поле ``out_dir``
-    игнорируется (имеет смысл только при приёме). ``exclude`` croc принимает
-    одной строкой через запятую — флаг ``--exclude`` добавляется ровно один раз.
+    Возвращает ``[<глобальные флаги>, "send", <флаги send>, <paths...>]``.
+    Флаги подкоманды ``send``: ``--code``, ``--hash``, ``--exclude``,
+    ``--transfers``. Поле ``out_dir`` игнорируется (имеет смысл только при
+    приёме). ``exclude`` croc принимает одной строкой через запятую — флаг
+    ``--exclude`` добавляется ровно один раз.
+
+    ``--ignore-stdin`` добавляется всегда: ``CrocRunner`` открывает stdin
+    процесса как PIPE, а croc send с piped stdin переключается в режим
+    ``cat file | croc send`` — отправляет stdin вместо файлов и ждёт EOF
+    вечно. Приёму флаг ставить нельзя: там stdin нужен для ответов y/n.
     """
-    args = ["send", *_common_args(opts)]
+    args = [*_global_args(opts), "--ignore-stdin", "send"]
     if opts.code is not None:
         args.extend(("--code", opts.code))
+    if opts.hash_algo is not None:
+        args.extend(("--hash", opts.hash_algo))
     if opts.exclude:
         args.extend(("--exclude", ",".join(opts.exclude)))
     if opts.transfers is not None:
@@ -99,10 +113,11 @@ def build_receive_args(opts: CrocOptions, code: str) -> list[str]:
     """Полный хвост argv для приёма: ``croc <результат>``.
 
     Приём у croc — без подкоманды, кодовая фраза передаётся позиционным
-    аргументом ``code``. Send-only поля (``opts.code``, ``exclude``,
-    ``transfers``) игнорируются.
+    аргументом ``code``. Send-only поля (``opts.code``, ``hash_algo``,
+    ``exclude``, ``transfers``) игнорируются: у приёма таких флагов нет,
+    и croc упал бы на неизвестном флаге.
     """
-    args = _common_args(opts)
+    args = _global_args(opts)
     if opts.out_dir is not None:
         args.extend(("--out", opts.out_dir))
     args.append(code)

@@ -27,7 +27,12 @@ class TransferStartEvent:
 
 @dataclass(frozen=True, slots=True)
 class ProgressEvent:
-    """Строка прогресс-бара (Sending/Receiving ... N% ...)."""
+    """Строка прогресс-бара.
+
+    В croc v10 направление печатается отдельной строкой, поэтому
+    ``direction`` может быть пустым; ``rate`` пуст в нулевых обновлениях
+    (v10 печатает скорость только при ненулевом прогрессе).
+    """
 
     direction: str
     filename: str

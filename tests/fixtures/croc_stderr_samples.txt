@@ -13,3 +13,9 @@ Receiving (<-10.0.0.2:9009) IMG_0002.jpg  47% |█████████      
 Error: could not connect to relay
 failed to connect: dial tcp 192.168.225.37:9009: i/o timeout
 some future unknown croc output format
+Sending 0 files (512.0 kB)
+Receiving 'payload.bin' (512.0 kB)
+Sending (->10.8.1.1:42767)
+Receiving (<-127.0.0.1:42731)
+payload.bin   0% |                    | ( 0 B/524 kB) [0s:0s]
+payload.bin 100% |████████████████████| (524/524 kB, 131 MB/s)

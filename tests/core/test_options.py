@@ -14,7 +14,8 @@ from pycroc.core.options import (
 # --- Round-trip хелперы: argparse-эквивалент CLI croc -------------------------
 
 
-def _add_common_flags(parser: argparse.ArgumentParser) -> None:
+def _add_global_flags(parser: argparse.ArgumentParser) -> None:
+    """Глобальные флаги croc: идут ДО подкоманды send / кодовой фразы."""
     parser.add_argument("--yes", action="store_true")
     parser.add_argument("--no-compress", dest="no_compress", action="store_true")
     parser.add_argument("--ask", action="store_true")
@@ -25,43 +26,52 @@ def _add_common_flags(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--connect")
     parser.add_argument("--throttleUpload", dest="throttle_upload")
     parser.add_argument("--curve")
-    parser.add_argument("--hash", dest="hash_algo")
+    parser.add_argument("--ignore-stdin", dest="ignore_stdin", action="store_true")
 
 
 def parse_send_argv(argv: list[str]) -> tuple[CrocOptions, list[str]]:
-    """Разбирает argv отправки обратно в (CrocOptions, paths)."""
-    assert argv[0] == "send"
-    parser = argparse.ArgumentParser(exit_on_error=False)
-    _add_common_flags(parser)
-    parser.add_argument("--code")
-    parser.add_argument("--exclude")
-    parser.add_argument("--transfers", type=int)
-    parser.add_argument("paths", nargs="*")
-    ns = parser.parse_args(argv[1:])
+    """Разбирает argv отправки обратно в (CrocOptions, paths).
+
+    Повторяет реальную структуру CLI croc v10:
+    ``[GLOBAL OPTIONS] send [COMMAND OPTIONS] <paths...>``.
+    """
+    split = argv.index("send")
+    global_parser = argparse.ArgumentParser(exit_on_error=False)
+    _add_global_flags(global_parser)
+    global_ns = global_parser.parse_args(argv[:split])
+
+    send_parser = argparse.ArgumentParser(exit_on_error=False)
+    send_parser.add_argument("--code")
+    send_parser.add_argument("--hash", dest="hash_algo")
+    send_parser.add_argument("--exclude")
+    send_parser.add_argument("--transfers", type=int)
+    send_parser.add_argument("paths", nargs="*")
+    send_ns = send_parser.parse_args(argv[split + 1 :])
+
     opts = CrocOptions(
-        code=ns.code,
-        pass_=ns.pass_,
-        relay=ns.relay,
-        relay6=ns.relay6,
+        code=send_ns.code,
+        pass_=global_ns.pass_,
+        relay=global_ns.relay,
+        relay6=global_ns.relay6,
         out_dir=None,
-        socks5=ns.socks5,
-        connect=ns.connect,
-        throttle_upload=ns.throttle_upload,
-        curve=ns.curve,
-        hash_algo=ns.hash_algo,
-        no_compress=ns.no_compress,
-        ask=ns.ask,
-        auto_accept=ns.yes,
-        exclude=tuple(ns.exclude.split(",")) if ns.exclude else (),
-        transfers=ns.transfers,
+        socks5=global_ns.socks5,
+        connect=global_ns.connect,
+        throttle_upload=global_ns.throttle_upload,
+        curve=global_ns.curve,
+        hash_algo=send_ns.hash_algo,
+        no_compress=global_ns.no_compress,
+        ask=global_ns.ask,
+        auto_accept=global_ns.yes,
+        exclude=tuple(send_ns.exclude.split(",")) if send_ns.exclude else (),
+        transfers=send_ns.transfers,
     )
-    return opts, list(ns.paths)
+    return opts, list(send_ns.paths)
 
 
 def parse_receive_argv(argv: list[str]) -> tuple[CrocOptions, str]:
     """Разбирает argv приёма обратно в (CrocOptions, code)."""
     parser = argparse.ArgumentParser(exit_on_error=False)
-    _add_common_flags(parser)
+    _add_global_flags(parser)
     parser.add_argument("--out", dest="out_dir")
     parser.add_argument("code")
     ns = parser.parse_args(argv)
@@ -74,7 +84,6 @@ def parse_receive_argv(argv: list[str]) -> tuple[CrocOptions, str]:
         connect=ns.connect,
         throttle_upload=ns.throttle_upload,
         curve=ns.curve,
-        hash_algo=ns.hash_algo,
         no_compress=ns.no_compress,
         ask=ns.ask,
         auto_accept=ns.yes,
@@ -114,10 +123,21 @@ def test_send_auto_accept_adds_yes() -> None:
 # --- Позиционные аргументы и направление-специфичные поля ----------------------
 
 
-def test_send_args_start_with_subcommand_and_end_with_paths() -> None:
-    args = build_send_args(CrocOptions(), ["a.txt", "b.txt"])
-    assert args[0] == "send"
+def test_send_global_flags_precede_subcommand_send_flags_follow() -> None:
+    args = build_send_args(
+        CrocOptions(relay="r:9009", code="x-y", hash_algo="imohash"), ["a.txt", "b.txt"]
+    )
+    # croc [GLOBAL] send [SEND-OPTS] paths — глобальный флаг после send валит croc
+    assert args.index("--relay") < args.index("send")
+    assert args.index("send") < args.index("--code")
+    assert args.index("send") < args.index("--hash")
     assert args[-2:] == ["a.txt", "b.txt"]
+
+
+def test_send_always_ignores_stdin_receive_never() -> None:
+    # stdin процесса — PIPE (для y/n); без --ignore-stdin croc send шлёт stdin
+    assert "--ignore-stdin" in build_send_args(CrocOptions(), ["f"])
+    assert "--ignore-stdin" not in build_receive_args(CrocOptions(), "a-b-c")
 
 
 def test_receive_args_have_no_subcommand_and_end_with_code() -> None:
@@ -132,15 +152,22 @@ def test_send_ignores_out_dir() -> None:
 
 
 def test_receive_ignores_send_only_fields() -> None:
-    opts = CrocOptions(code="custom-code", exclude=("x",), transfers=8)
+    opts = CrocOptions(code="custom-code", exclude=("x",), transfers=8, hash_algo="imohash")
     args = build_receive_args(opts, "a-b-c")
     assert "--code" not in args
     assert "--exclude" not in args
     assert "--transfers" not in args
+    # --hash — флаг подкоманды send; у приёма его нет, croc упал бы
+    assert "--hash" not in args
 
 
 def test_none_fields_produce_no_flags() -> None:
-    assert build_send_args(CrocOptions(auto_accept=False), ["f"]) == ["send", "f"]
+    # --ignore-stdin — единственный безусловный флаг отправки
+    assert build_send_args(CrocOptions(auto_accept=False), ["f"]) == [
+        "--ignore-stdin",
+        "send",
+        "f",
+    ]
     assert build_receive_args(CrocOptions(auto_accept=False), "a-b-c") == ["a-b-c"]
 
 
@@ -157,7 +184,7 @@ def test_send_round_trip_all_fields() -> None:
         socks5="127.0.0.1:1080",
         connect="proxy.example.com:8080",
         throttle_upload="500k",
-        curve="P-521",
+        curve="p521",
         hash_algo="imohash",
         no_compress=True,
         ask=True,
@@ -172,7 +199,8 @@ def test_send_round_trip_all_fields() -> None:
 
 
 def test_receive_round_trip_all_fields() -> None:
-    # Send-only поля (code/exclude/transfers) не участвуют: receive их игнорирует.
+    # Send-only поля (code/hash_algo/exclude/transfers) не участвуют:
+    # receive их игнорирует.
     opts = CrocOptions(
         pass_="s3cret",
         relay="relay.example.com:9009",
@@ -181,8 +209,7 @@ def test_receive_round_trip_all_fields() -> None:
         socks5="127.0.0.1:1080",
         connect="proxy.example.com:8080",
         throttle_upload="500k",
-        curve="SIEC",
-        hash_algo="xxhash",
+        curve="siec",
         no_compress=True,
         ask=True,
         auto_accept=False,
