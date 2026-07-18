@@ -273,6 +273,47 @@ async def test_form_defaults_come_from_active_profile(tmp_path: Path) -> None:
         assert panel.query_one("#opt-auto-accept", Checkbox).value is True
 
 
+# --- Фиксы конспекта ручного тестирования ---------------------------------------------
+
+
+async def test_arrow_keys_move_focus_between_form_fields(tmp_path: Path) -> None:
+    """Пункт 2 конспекта: стрелки вверх/вниз переключают поля формы опций."""
+    panel, _ = make_panel(tmp_path, FakeRunner([]))
+    app = PanelApp(panel)
+    async with app.run_test(size=(120, 40)) as pilot:
+        panel.query_one("#opt-code", Input).focus()
+        await pilot.pause()
+        await pilot.press("down")
+        assert app.focused is not None and app.focused.id == "opt-pass"
+        await pilot.press("down")
+        assert app.focused is not None and app.focused.id == "opt-relay"
+        await pilot.press("up")
+        assert app.focused is not None and app.focused.id == "opt-pass"
+
+
+async def test_code_event_enables_copy_button_and_notifies(tmp_path: Path) -> None:
+    """Пункт 5 конспекта: код виден и копируется сразу после CodeEvent."""
+    runner = FakeRunner([CodeEvent(code="slow-tomato-almond")], hold=True)
+    panel, file_path = make_panel(tmp_path, runner)
+    app = PanelApp(panel)
+    async with app.run_test(size=(120, 40)) as pilot:
+        panel.query_one(MultiSelectDirectoryTree).toggle(file_path)
+        panel.action_send()
+        await pilot.pause()
+
+        copy_button = panel.query_one("#copy-code-button", Button)
+        assert copy_button.disabled is False
+        assert any(
+            "slow-tomato-almond" in n.message for n in app._notifications
+        ), "код должен дублироваться уведомлением"
+
+        await pilot.click("#copy-code-button")
+        assert app.clipboard == "slow-tomato-almond"
+
+        panel.action_cancel()
+        await wait_transfer(panel)
+
+
 # --- MultiSelectDirectoryTree ---------------------------------------------------------
 
 
@@ -300,3 +341,54 @@ async def test_file_picker_toggle_and_selected_paths(tmp_path: Path) -> None:
         tree.clear_selection()
         assert tree.selected_paths() == []
         tree.action_toggle_selected()  # курсор на корне — отмечает его без падения
+
+
+async def test_toggle_invalidates_tree_label_cache(tmp_path: Path) -> None:
+    """Пункт 1 конспекта: toggle должен сбрасывать кеш меток Tree.
+
+    Ключ кеша строки включает root._updates; без bump root галочка не
+    перерисовывается до следующего события (готча №13 notes.md).
+    """
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    file_a = data_dir / "a.txt"
+    file_a.write_text("a", encoding="utf-8")
+
+    class TreeApp(App[None]):
+        def compose(self) -> ComposeResult:
+            yield MultiSelectDirectoryTree(data_dir)
+
+    app = TreeApp()
+    async with app.run_test():
+        tree = app.query_one(MultiSelectDirectoryTree)
+        updates_before = tree.root._updates
+        tree.toggle(file_a)
+        assert tree.root._updates > updates_before
+
+
+async def test_mouse_click_on_file_toggles_selection(tmp_path: Path) -> None:
+    """Пункт 4 конспекта: клик мышью по файлу ставит/снимает отметку."""
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    file_a = data_dir / "a.txt"
+    file_a.write_text("a", encoding="utf-8")
+
+    class TreeApp(App[None]):
+        def compose(self) -> ComposeResult:
+            yield MultiSelectDirectoryTree(data_dir)
+
+    app = TreeApp()
+    async with app.run_test() as pilot:
+        tree = app.query_one(MultiSelectDirectoryTree)
+        for _ in range(20):  # ждём асинхронную загрузку каталога
+            await pilot.pause()
+            if tree.root.children:
+                break
+        assert tree.root.children, "каталог не загрузился"
+
+        await pilot.click(tree, offset=(8, 1))  # строка 1 — файл a.txt
+        assert tree.selected_paths() == [str(file_a)]
+
+        await pilot.pause(0.4)
+        await pilot.click(tree, offset=(8, 1))  # повторный клик снимает отметку
+        assert tree.selected_paths() == []

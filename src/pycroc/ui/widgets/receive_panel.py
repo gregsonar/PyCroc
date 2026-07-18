@@ -12,9 +12,11 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import datetime
+from typing import ClassVar
 
 from textual import on
 from textual.app import ComposeResult
+from textual.binding import Binding, BindingType
 from textual.containers import Horizontal, Vertical
 from textual.css.query import NoMatches
 from textual.suggester import Suggester
@@ -55,6 +57,18 @@ class HistoryCodeSuggester(Suggester):
 
 class ReceivePanel(Vertical):
     """Вкладка Receive."""
+
+    BINDINGS: ClassVar[list[BindingType]] = [
+        # как в OptionsForm: стрелки двигают фокус по полям (пункт 2 конспекта)
+        Binding("down", "focus_next_field", "Следующее поле", show=False),
+        Binding("up", "focus_previous_field", "Предыдущее поле", show=False),
+    ]
+
+    def action_focus_next_field(self) -> None:
+        self.screen.focus_next()
+
+    def action_focus_previous_field(self) -> None:
+        self.screen.focus_previous()
 
     DEFAULT_CSS = """
     ReceivePanel {

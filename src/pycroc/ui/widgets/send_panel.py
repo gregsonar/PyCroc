@@ -68,6 +68,15 @@ class SendPanel(Vertical):
     #send-progress {
         margin-top: 1;
     }
+    #send-code-row {
+        height: auto;
+    }
+    #send-code-text {
+        text-style: bold;
+    }
+    #copy-code-button {
+        margin-left: 2;
+    }
     """
 
     def __init__(
@@ -87,11 +96,12 @@ class SendPanel(Vertical):
         #: Активный worker передачи; тесты и отмена ждут именно его, а не все
         #: worker-ы приложения (у DirectoryTree есть вечный загрузчик)
         self.transfer_worker: Worker[None] | None = None
+        self._current_code: str | None = None
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="send-layout"):
             with Vertical(id="send-left"):
-                yield Label("Файлы и папки (space — отметить):")
+                yield Label("Файлы и папки (space — выбрать):")
                 yield MultiSelectDirectoryTree(self._start_path, id="file-picker")
                 with Horizontal(classes="buttons"):
                     yield Button("Отправить", variant="primary", id="send-button")
@@ -100,11 +110,17 @@ class SendPanel(Vertical):
                 yield Label("", id="send-rate")
                 yield Label("", id="send-status")
             with VerticalScroll(id="send-form"):
+                # Код и QR — ПЕРВЫМИ в прокручиваемой колонке: внизу под
+                # формой они обновлялись за пределами видимой области, и без
+                # заданного --code получатель не мог узнать код вовсе
+                # (пункт 5 конспекта, критичный)
+                yield Label("Код передачи:", classes="form-title")
+                with Horizontal(id="send-code-row"):
+                    yield Label("", id="send-code-text")
+                    yield Button("Копировать", id="copy-code-button", disabled=True)
+                yield QrCodeWidget(id="send-qr")
                 yield Label("Опции (пустое поле — по умолчанию):", classes="form-title")
                 yield OptionsForm(id="send-options")
-                yield Label("Код передачи:", classes="form-title")
-                yield Label("", id="send-code-text")
-                yield QrCodeWidget(id="send-qr")
 
     def on_mount(self) -> None:
         active = self._config.get_active_profile_name()
@@ -127,6 +143,12 @@ class SendPanel(Vertical):
     @on(Button.Pressed, "#cancel-button")
     def _cancel_pressed(self) -> None:
         self.action_cancel()
+
+    @on(Button.Pressed, "#copy-code-button")
+    def _copy_code_pressed(self) -> None:
+        if self._current_code:
+            self.app.copy_to_clipboard(self._current_code)
+            self.notify("Код скопирован в буфер обмена")
 
     def action_send(self) -> None:
         paths = self.query_one(MultiSelectDirectoryTree).selected_paths()
@@ -156,6 +178,8 @@ class SendPanel(Vertical):
         rate_label.update("")
         code_label.update("")
         qr.code = None
+        self._current_code = None
+        self.query_one("#copy-code-button", Button).disabled = True
         status_label.update("Запуск croc…")
         self._set_transferring(True)
 
@@ -168,8 +192,13 @@ class SendPanel(Vertical):
             async for event in self._runner.send(paths, options):
                 if isinstance(event, CodeEvent):
                     code_value = event.code
+                    self._current_code = event.code
                     qr.code = event.code
                     code_label.update(event.code)
+                    self.query_one("#copy-code-button", Button).disabled = False
+                    # код дублируется уведомлением: критично, чтобы получатель
+                    # мог его узнать сразу (пункт 5 конспекта)
+                    self.notify(f"Код передачи: {event.code}", timeout=10)
                     status_label.update("Ожидание получателя…")
                 elif isinstance(event, TransferStartEvent):
                     status_label.update(f"Отправка {event.filename}…")

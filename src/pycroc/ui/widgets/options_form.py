@@ -8,7 +8,10 @@
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 from textual.app import ComposeResult
+from textual.binding import Binding, BindingType
 from textual.containers import Vertical
 from textual.widgets import Checkbox, Input
 
@@ -16,13 +19,33 @@ from pycroc.core.options import CrocOptions, normalize_text
 
 
 class OptionsForm(Vertical):
-    """Поля всех опций croc; id полей — ``opt-*``."""
+    """Поля всех опций croc; id полей — ``opt-*``.
+
+    Стрелки вверх/вниз переключают фокус между полями формы (пункт 2
+    конспекта: официальный стандарт Textual — Tab/Shift+Tab, но биндинг
+    стрелок на focus_next/focus_previous — принятый паттерн). Биндинги
+    висят на контейнере, поэтому срабатывают только когда фокус внутри
+    формы, и не задевают дерево файлов или таблицы.
+    """
+
+    BINDINGS: ClassVar[list[BindingType]] = [
+        # действия локальные: "screen.focus_next" в биндинге контейнера
+        # тихо не срабатывает (готча — см. notes.md)
+        Binding("down", "focus_next_field", "Следующее поле", show=False),
+        Binding("up", "focus_previous_field", "Предыдущее поле", show=False),
+    ]
 
     DEFAULT_CSS = """
     OptionsForm {
         height: auto;
     }
     """
+
+    def action_focus_next_field(self) -> None:
+        self.screen.focus_next()
+
+    def action_focus_previous_field(self) -> None:
+        self.screen.focus_previous()
 
     def compose(self) -> ComposeResult:
         yield Input(placeholder="--code: своя кодовая фраза", id="opt-code")
