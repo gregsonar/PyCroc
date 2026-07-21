@@ -118,4 +118,4 @@ mypy src --strict
 Интеграционные тесты используют заглушку `tests/fixtures/fake_croc.py` —
 реальный croc и сеть не требуются. Неочевидные готчи собраны в
 [docs/notes.md](docs/notes.md); план разработки —
-[docs/plans/pycroc-tui-plan.md](docs/plans/pycroc-tui-plan.md).
+[docs/plans/completed/pycroc-plan.md](docs/plans/completed/pycroc-plan.md).
