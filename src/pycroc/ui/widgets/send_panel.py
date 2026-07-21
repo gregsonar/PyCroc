@@ -65,6 +65,9 @@ class SendPanel(Vertical):
     #cancel-button {
         margin-left: 2;
     }
+    #clear-selection-button {
+        margin-left: 2;
+    }
     #send-progress {
         margin-top: 1;
     }
@@ -106,6 +109,7 @@ class SendPanel(Vertical):
                 with Horizontal(classes="buttons"):
                     yield Button("Отправить", variant="primary", id="send-button")
                     yield Button("Отменить", id="cancel-button", disabled=True)
+                    yield Button("Снять выделение", id="clear-selection-button")
                 yield ProgressBar(total=100, show_eta=False, id="send-progress")
                 yield Label("", id="send-rate")
                 yield Label("", id="send-status")
@@ -149,6 +153,15 @@ class SendPanel(Vertical):
         if self._current_code:
             self.app.copy_to_clipboard(self._current_code)
             self.notify("Код скопирован в буфер обмена")
+
+    @on(Button.Pressed, "#clear-selection-button")
+    def _clear_selection_pressed(self) -> None:
+        # сброс всех отметок разом — не искать каждую в большом дереве
+        tree = self.query_one(MultiSelectDirectoryTree)
+        if not tree.selected_paths():
+            self.notify("Нет отмеченных файлов", severity="warning")
+            return
+        tree.clear_selection()
 
     def action_send(self) -> None:
         paths = self.query_one(MultiSelectDirectoryTree).selected_paths()

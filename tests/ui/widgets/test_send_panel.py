@@ -314,6 +314,39 @@ async def test_code_event_enables_copy_button_and_notifies(tmp_path: Path) -> No
         await wait_transfer(panel)
 
 
+async def test_clear_selection_button_resets_all_marks(tmp_path: Path) -> None:
+    """Пункт 8 конспекта: кнопка «Снять выделение» сбрасывает все отметки."""
+    data_dir = tmp_path / "data"
+    data_dir.mkdir(exist_ok=True)
+    file_a = data_dir / "a.txt"
+    file_b = data_dir / "b.txt"
+    file_a.write_text("a", encoding="utf-8")
+    file_b.write_text("b", encoding="utf-8")
+    panel = SendPanel(
+        runner=FakeRunner([]),
+        history=FakeHistory(),
+        config=ConfigStore(tmp_path / "config.toml"),
+        start_path=data_dir,
+    )
+    async with PanelApp(panel).run_test(size=(120, 40)) as pilot:
+        tree = panel.query_one(MultiSelectDirectoryTree)
+        tree.toggle(file_a)
+        tree.toggle(file_b)
+        assert tree.selected_paths() == [str(file_a), str(file_b)]
+
+        await pilot.click("#clear-selection-button")
+        assert tree.selected_paths() == []
+
+
+async def test_clear_selection_button_warns_when_nothing_selected(tmp_path: Path) -> None:
+    panel, _ = make_panel(tmp_path, FakeRunner([]))
+    app = PanelApp(panel)
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.click("#clear-selection-button")
+        await pilot.pause()
+        assert any("Нет отмеченных" in n.message for n in app._notifications)
+
+
 # --- MultiSelectDirectoryTree ---------------------------------------------------------
 
 
