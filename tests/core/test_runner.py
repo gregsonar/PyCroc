@@ -37,10 +37,13 @@ def _write_scenario(
     steps: list[dict[str, Any]],
     exit_code: int = 0,
     stdin_capture: Path | None = None,
+    invocation_capture: Path | None = None,
 ) -> None:
     scenario: dict[str, Any] = {"steps": steps, "exit_code": exit_code}
     if stdin_capture is not None:
         scenario["stdin_capture"] = str(stdin_capture)
+    if invocation_capture is not None:
+        scenario["invocation_capture"] = str(invocation_capture)
     scenario_path = tmp_path / "scenario.json"
     scenario_path.write_text(json.dumps(scenario), encoding="utf-8")
     monkeypatch.setenv("PYCROC_FAKE_CROC_SCENARIO", str(scenario_path))
@@ -227,3 +230,60 @@ async def test_manual_reject_writes_n(
 
     assert capture.read_text(encoding="utf-8") == "n\n"
     assert events[0] == AcceptPromptEvent(filename="file.txt", size="116 B")
+
+
+# --- CROC_SECRET: кодовая фраза через окружение, не через argv -------------------
+
+
+async def test_send_code_passed_via_env_not_argv(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    invocation = tmp_path / "invocation.json"
+    _write_scenario(
+        tmp_path,
+        monkeypatch,
+        [{"line": "Code is: slow-tomato-almond"}],
+        invocation_capture=invocation,
+    )
+    runner = CrocRunner(binary_path=FAKE_CROC)
+    async for _ in runner.send(["file.txt"], CrocOptions(code="slow-tomato-almond")):
+        pass
+
+    captured = json.loads(invocation.read_text(encoding="utf-8"))
+    assert captured["croc_secret"] == "slow-tomato-almond"
+    assert "slow-tomato-almond" not in captured["argv"]
+    assert "--code" not in captured["argv"]
+
+
+async def test_receive_code_passed_via_env_not_argv(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    invocation = tmp_path / "invocation.json"
+    _write_scenario(tmp_path, monkeypatch, [], invocation_capture=invocation)
+    runner = CrocRunner(binary_path=FAKE_CROC)
+    async for _ in runner.receive("slow-tomato-almond", CrocOptions()):
+        pass
+
+    captured = json.loads(invocation.read_text(encoding="utf-8"))
+    assert captured["croc_secret"] == "slow-tomato-almond"
+    assert "slow-tomato-almond" not in captured["argv"]
+
+
+async def test_send_without_custom_code_sets_no_secret(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("CROC_SECRET", raising=False)  # чистое окружение теста
+    invocation = tmp_path / "invocation.json"
+    _write_scenario(
+        tmp_path,
+        monkeypatch,
+        [{"line": "Code is: generated-by-croc"}],
+        invocation_capture=invocation,
+    )
+    runner = CrocRunner(binary_path=FAKE_CROC)
+    async for _ in runner.send(["file.txt"], CrocOptions()):
+        pass
+
+    # без своего кода CROC_SECRET не выставляется — croc генерирует фразу сам
+    captured = json.loads(invocation.read_text(encoding="utf-8"))
+    assert captured["croc_secret"] is None

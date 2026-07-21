@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import re
 import sys
 from collections import deque
@@ -23,7 +24,12 @@ from pycroc.core.events import (
     Event,
 )
 from pycroc.core.exceptions import CrocNotFoundError, TransferInProgressError
-from pycroc.core.options import CrocOptions, build_receive_args, build_send_args
+from pycroc.core.options import (
+    CrocOptions,
+    build_receive_args,
+    build_send_args,
+    croc_secret_env,
+)
 from pycroc.core.parser import parse_line, split_stream_chunks
 
 logger = logging.getLogger(__name__)
@@ -62,13 +68,22 @@ class CrocRunner:
             self._command = (binary_path,)
 
     async def send(self, paths: list[str], options: CrocOptions) -> AsyncIterator[Event]:
-        """Отправка файлов/папок; события по мере разбора stderr."""
-        async for event in self._run(build_send_args(options, paths), options):
+        """Отправка файлов/папок; события по мере разбора stderr.
+
+        Своя кодовая фраза (``options.code``) уходит через ``CROC_SECRET``,
+        не через argv — не светится в списке процессов.
+        """
+        async for event in self._run(
+            build_send_args(options, paths), options, secret=options.code
+        ):
             yield event
 
     async def receive(self, code: str, options: CrocOptions) -> AsyncIterator[Event]:
-        """Приём по кодовой фразе; события по мере разбора stderr."""
-        async for event in self._run(build_receive_args(options, code), options):
+        """Приём по кодовой фразе; события по мере разбора stderr.
+
+        Код передаётся через ``CROC_SECRET`` (не позиционным аргументом).
+        """
+        async for event in self._run(build_receive_args(options), options, secret=code):
             yield event
 
     async def cancel(self) -> None:
@@ -122,7 +137,9 @@ class CrocRunner:
         match = _VERSION_RE.search(text)
         return match.group(0) if match else text
 
-    async def _run(self, argv: list[str], options: CrocOptions) -> AsyncIterator[Event]:
+    async def _run(
+        self, argv: list[str], options: CrocOptions, *, secret: str | None
+    ) -> AsyncIterator[Event]:
         if self._running:
             raise TransferInProgressError(
                 "передача уже выполняется: croc поддерживает один канал на процесс"
@@ -137,6 +154,7 @@ class CrocRunner:
                     stdin=asyncio.subprocess.PIPE,
                     stdout=asyncio.subprocess.DEVNULL,
                     stderr=asyncio.subprocess.PIPE,
+                    env=croc_secret_env(secret, os.environ),
                 )
             except OSError as exc:
                 raise CrocNotFoundError(

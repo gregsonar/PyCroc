@@ -47,6 +47,16 @@ def main() -> int:
     with open(scenario_path, encoding="utf-8") as fh:
         scenario: dict[str, Any] = json.load(fh)
 
+    # Для тестов CROC_SECRET: пишем полученные argv и код из окружения в файл,
+    # чтобы проверить, что кодовая фраза пришла через env, а не через argv.
+    invocation_path = scenario.get("invocation_capture")
+    if invocation_path:
+        with open(invocation_path, "w", encoding="utf-8") as out:
+            json.dump(
+                {"argv": sys.argv[1:], "croc_secret": os.environ.get("CROC_SECRET")},
+                out,
+            )
+
     capture_path = scenario.get("stdin_capture")
     for step in scenario.get("steps", []):
         if "delay" in step:

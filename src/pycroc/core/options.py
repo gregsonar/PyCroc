@@ -11,7 +11,7 @@ croc поддерживает ``--pass FILEWITHPASSWORD``, валидация ф
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 
 
@@ -86,10 +86,14 @@ def build_send_args(opts: CrocOptions, paths: Sequence[str]) -> list[str]:
     """Полный хвост argv для отправки: ``croc <результат>``.
 
     Возвращает ``[<глобальные флаги>, "send", <флаги send>, <paths...>]``.
-    Флаги подкоманды ``send``: ``--code``, ``--hash``, ``--exclude``,
-    ``--transfers``. Поле ``out_dir`` игнорируется (имеет смысл только при
-    приёме). ``exclude`` croc принимает одной строкой через запятую — флаг
+    Флаги подкоманды ``send``: ``--hash``, ``--exclude``, ``--transfers``.
+    Поле ``out_dir`` игнорируется (имеет смысл только при приёме).
+    ``exclude`` croc принимает одной строкой через запятую — флаг
     ``--exclude`` добавляется ровно один раз.
+
+    Кодовая фраза (``opts.code``) в argv НЕ попадает: она передаётся через
+    переменную окружения ``CROC_SECRET`` (см. :func:`croc_secret_env`),
+    чтобы не светиться в списке процессов ОС — это рекомендует сам croc.
 
     ``--ignore-stdin`` добавляется всегда: ``CrocRunner`` открывает stdin
     процесса как PIPE, а croc send с piped stdin переключается в режим
@@ -97,8 +101,6 @@ def build_send_args(opts: CrocOptions, paths: Sequence[str]) -> list[str]:
     вечно. Приёму флаг ставить нельзя: там stdin нужен для ответов y/n.
     """
     args = [*_global_args(opts), "--ignore-stdin", "send"]
-    if opts.code is not None:
-        args.extend(("--code", opts.code))
     if opts.hash_algo is not None:
         args.extend(("--hash", opts.hash_algo))
     if opts.exclude:
@@ -109,16 +111,32 @@ def build_send_args(opts: CrocOptions, paths: Sequence[str]) -> list[str]:
     return args
 
 
-def build_receive_args(opts: CrocOptions, code: str) -> list[str]:
+def build_receive_args(opts: CrocOptions) -> list[str]:
     """Полный хвост argv для приёма: ``croc <результат>``.
 
-    Приём у croc — без подкоманды, кодовая фраза передаётся позиционным
-    аргументом ``code``. Send-only поля (``opts.code``, ``hash_algo``,
-    ``exclude``, ``transfers``) игнорируются: у приёма таких флагов нет,
-    и croc упал бы на неизвестном флаге.
+    Приём у croc — без подкоманды и БЕЗ позиционной кодовой фразы: код
+    передаётся через ``CROC_SECRET`` (см. :func:`croc_secret_env`), при
+    установленной переменной croc с пустым позиционным аргументом уходит
+    в приём. Send-only поля (``opts.code``, ``hash_algo``, ``exclude``,
+    ``transfers``) игнорируются: у приёма таких флагов нет, и croc упал бы
+    на неизвестном флаге.
     """
     args = _global_args(opts)
     if opts.out_dir is not None:
         args.extend(("--out", opts.out_dir))
-    args.append(code)
     return args
+
+
+def croc_secret_env(
+    secret: str | None, base_env: Mapping[str, str]
+) -> dict[str, str] | None:
+    """Окружение для запуска croc с кодовой фразой в ``CROC_SECRET``.
+
+    Возвращает копию ``base_env`` с добавленным ``CROC_SECRET`` при наличии
+    ``secret``; ``None`` — если фразы нет (отправка без своего кода: croc
+    сгенерирует её сам), чтобы ``create_subprocess_exec`` унаследовал
+    окружение родителя без изменений.
+    """
+    if secret is None:
+        return None
+    return {**base_env, "CROC_SECRET": secret}
