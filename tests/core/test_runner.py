@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 from typing import Any
@@ -139,6 +140,44 @@ async def test_cancel_during_transfer_ends_generator_cleanly(
 
     assert [e.percent for e in events if isinstance(e, ProgressEvent)] == [10]
     assert not any(isinstance(e, ErrorEvent | DoneEvent) for e in events)
+
+
+# --- _read_or_cancel: отзывчивость чтения к отмене (п.11/14) ----------------------
+
+
+async def test_read_or_cancel_returns_none_when_event_set_during_blocked_read() -> None:
+    """Взведённый cancel_event прерывает висящее чтение → None (не EOF).
+
+    Это ядро фикса «Cancel не работает»: настоящий croc (или его shim-дитя)
+    может держать пайп открытым, read() висит без EOF — событие рвёт ожидание.
+    """
+    reader = asyncio.StreamReader()  # никто не кормит → read() висит
+    event = asyncio.Event()
+
+    async def set_soon() -> None:
+        await asyncio.sleep(0.05)
+        event.set()
+
+    asyncio.ensure_future(set_soon())
+    result = await asyncio.wait_for(
+        CrocRunner._read_or_cancel(reader, event), timeout=2
+    )
+    assert result is None
+
+
+async def test_read_or_cancel_returns_data_when_read_completes() -> None:
+    reader = asyncio.StreamReader()
+    reader.feed_data(b"Code is: x-y-z\n")
+    reader.feed_eof()
+    result = await CrocRunner._read_or_cancel(reader, asyncio.Event())
+    assert result == b"Code is: x-y-z\n"
+
+
+async def test_read_or_cancel_returns_empty_bytes_on_eof() -> None:
+    reader = asyncio.StreamReader()
+    reader.feed_eof()
+    result = await CrocRunner._read_or_cancel(reader, asyncio.Event())
+    assert result == b""
 
 
 # --- Параллельный запуск ----------------------------------------------------------

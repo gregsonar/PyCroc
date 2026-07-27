@@ -60,38 +60,50 @@
    через `croc_secret_env()`. Env=None (нет своего кода) → наследуется
    окружение родителя, croc генерирует фразу сам.
 
+9. **chocolatey ставит `croc` как SHIM, реальный croc — дочерний процесс.**
+   `bin\croc.exe` (~383 КБ) — лаунчер, он запускает `lib\croc\tools\croc.exe`
+   (~16 МБ, настоящий Go-croc) ДОЧЕРНИМ процессом.
+   `proc.terminate()`/`kill()` из asyncio бьёт только по shim → настоящий
+   croc сиротеет: держит relay-комнату (ошибка «room (secure channel) not
+   ready, maybe peer disconnected» при повторе) и stderr-пайп (read без EOF →
+   `_run` висит, cancel «не работает», TUI замирает). Решение:
+   `CrocRunner._kill_tree()` — на Windows `taskkill /F /T /PID` снимает всё
+   дерево; плюс `_read_or_cancel()` рвёт чтение по `asyncio.Event`, не
+   дожидаясь EOF. Симптом-маркер: cancel занимал ровно `_TERMINATE_TIMEOUT`
+   (terminate по shim не убивал real croc → срабатывал kill по таймауту).
+
 ## Textual
 
-9. **`Widget._size` — внутренний атрибут** (объект `Size` компоновщика).
+10. **`Widget._size` — внутренний атрибут** (объект `Size` компоновщика).
    Поле `self._size` в наследнике ломает рендер загадочным
    `'str' object has no attribute 'region'`. Именовать поля специфичнее
    (`_target_size` в OverwriteConflictModal).
-10. **`Label.renderable` не существует** (Textual 8) — содержимое в тестах
+11. **`Label.renderable` не существует** (Textual 8) — содержимое в тестах
    читать через `str(label.render())`.
-11. **`Button` глушит повторный клик** пока играет его active-эффект (~0.3 с):
+12. **`Button` глушит повторный клик** пока играет его active-эффект (~0.3 с):
    два `pilot.click()` подряд по одной кнопке — второй молча теряется.
    В Pilot-тестах между кликами нужен `await pilot.pause(0.4)`.
-12. **Уведомления в тестах** проверяются только через приватный
+13. **Уведомления в тестах** проверяются только через приватный
    `app._notifications` — публичного API перечисления нет.
-13. **Worker + `finally` + размонтирование**: если панель удалена посреди
+14. **Worker + `finally` + размонтирование**: если панель удалена посреди
    передачи, `query_one` в finally кидает `NoMatches` (причём `is_mounted`
    ещё `True`, когда дети уже удалены) — финальные UI-обновления оборачивать
    в `try/except NoMatches`, запись в историю делать безусловно.
-14. **Кеш меток `Tree`**: `refresh()` не перерисовывает изменённую метку узла —
+15. **Кеш меток `Tree`**: `refresh()` не перерисовывает изменённую метку узла —
     ключ line-кеша включает счётчики `_updates` узлов в path строки. Решение:
     `self.root.refresh()` (bump `_updates` у root, который входит в path всех
     строк) + `self.refresh()` — см. `MultiSelectDirectoryTree._refresh_labels`.
-15. **`screen.focus_next` в BINDINGS контейнера тихо не срабатывает** (Textual
+16. **`screen.focus_next` в BINDINGS контейнера тихо не срабатывает** (Textual
     8.2.8): биндинг с неймспейсным действием на не-фокусируемом контейнере не
     выполняется, без ошибки. Решение: локальное действие
     (`action_focus_next_field` → `self.screen.focus_next()`).
 
 ## Python и типизация
 
-16. **`qrcode.print_ascii` использует `\xa0`** (неразрывный пробел) для
+17. **`qrcode.print_ascii` использует `\xa0`** (неразрывный пробел) для
     пустых модулей QR; для mypy нужны стабы `types-qrcode`.
-17. **Метод `list` в классе затеняет `builtins.list`** в аннотациях других
+18. **Метод `list` в классе затеняет `builtins.list`** в аннотациях других
     методов того же класса (mypy valid-type) — писать
     `builtins.list[...]` ([history.py](../src/pycroc/storage/history.py)).
-18. **`.py`-заглушку нельзя exec-нуть напрямую** (особенно на Windows):
+19. **`.py`-заглушку нельзя exec-нуть напрямую** (особенно на Windows):
     `CrocRunner` запускает пути с расширением `.py` через `sys.executable`.

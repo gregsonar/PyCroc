@@ -10,6 +10,7 @@ croc перерисовывает прогресс через ``\\r``), наре
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import os
 import re
@@ -53,6 +54,9 @@ class CrocRunner:
         self._proc: asyncio.subprocess.Process | None = None
         self._running = False
         self._cancel_requested = False
+        #: Взводится в cancel(), чтобы разбудить цикл чтения stderr, не
+        #: дожидаясь EOF (croc/его локальный relay могут держать пайп открытым)
+        self._cancel_event: asyncio.Event | None = None
         self.set_binary(binary_path)
 
     def set_binary(self, binary_path: str) -> None:
@@ -89,20 +93,48 @@ class CrocRunner:
     async def cancel(self) -> None:
         """Останавливает активную передачу.
 
-        ``terminate()`` (SIGTERM) предпочтительнее ``kill()``: croc корректно
-        освобождает relay-канал; ``kill()`` — только по таймауту. После отмены
-        генератор send/receive завершается без ``ErrorEvent`` и без исключения.
+        Сначала взводит ``_cancel_event`` — цикл чтения stderr в ``_run``
+        рвётся немедленно, не дожидаясь EOF, затем убивает всё дерево
+        процессов croc (см. :meth:`_kill_tree`). После отмены генератор
+        send/receive завершается без ``ErrorEvent`` и без исключения.
         """
         proc = self._proc
         if proc is None or proc.returncode is not None:
             return
         self._cancel_requested = True
-        proc.terminate()
-        try:
+        if self._cancel_event is not None:
+            self._cancel_event.set()
+        await self._kill_tree(proc)
+
+    async def _kill_tree(self, proc: asyncio.subprocess.Process) -> None:
+        """Убивает процесс и всех его потомков.
+
+        КРИТИЧНО на Windows: chocolatey ставит `croc` как shim
+        (`bin\\croc.exe`), который запускает НАСТОЯЩИЙ croc
+        (`lib\\croc\\tools\\croc.exe`) дочерним процессом.
+        ``proc.terminate()``/``kill()`` бьёт только по shim — настоящий croc
+        выживает, держит relay-комнату (ошибка «room not ready» при повторе)
+        и stderr-пайп (read без EOF → зависание). ``taskkill /T`` рекурсивно
+        снимает всё дерево. Grace-освобождение relay нам недоступно (до
+        настоящего croc сигнал не доходит) — комната освобождается на relay,
+        когда рвётся TCP-соединение убитого croc.
+        """
+        if proc.returncode is not None:
+            return
+        if sys.platform == "win32":
+            with contextlib.suppress(OSError):
+                killer = await asyncio.create_subprocess_exec(
+                    "taskkill", "/F", "/T", "/PID", str(proc.pid),
+                    stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.DEVNULL,
+                )
+                await killer.wait()
+        else:
+            # POSIX: обычно прямой бинарник без shim — kill главного достаточно
+            with contextlib.suppress(ProcessLookupError):
+                proc.kill()
+        with contextlib.suppress(TimeoutError):
             await asyncio.wait_for(proc.wait(), timeout=_TERMINATE_TIMEOUT)
-        except TimeoutError:
-            proc.kill()
-            await proc.wait()
 
     async def respond(self, accept: bool) -> None:
         """Ответ на ``AcceptPromptEvent`` при ``auto_accept=False``.
@@ -162,13 +194,17 @@ class CrocRunner:
                 ) from exc
             self._proc = proc
             self._cancel_requested = False
+            cancel_event = self._cancel_event = asyncio.Event()
             assert proc.stderr is not None
             buffer = b""
             recent_unrecognized: deque[str] = deque(maxlen=_ERROR_TAIL_LINES)
             error_seen = False
             eof = False
             while not eof:
-                chunk = await proc.stderr.read(_CHUNK_SIZE)
+                chunk = await self._read_or_cancel(proc.stderr, cancel_event)
+                if chunk is None:
+                    # отмена: рвём цикл сразу, не ждём EOF пайпа
+                    return
                 if chunk:
                     buffer += chunk
                     lines, buffer = split_stream_chunks(buffer)
@@ -208,9 +244,40 @@ class CrocRunner:
                 yield ErrorEvent(message=message)
         finally:
             if proc is not None and proc.returncode is None:
-                proc.terminate()
+                # аварийный выход/отмена: снять всё дерево, не оставлять
+                # осиротевший настоящий croc (shim-случай, см. _kill_tree)
+                await self._kill_tree(proc)
             self._proc = None
+            self._cancel_event = None
             self._running = False
+
+    @staticmethod
+    async def _read_or_cancel(
+        stream: asyncio.StreamReader, cancel_event: asyncio.Event
+    ) -> bytes | None:
+        """Читает чанк stderr, но прерывается при взведённом ``cancel_event``.
+
+        Возвращает прочитанные байты (``b""`` — EOF) либо ``None``, если
+        сработала отмена: тогда незавершённое чтение отменяется, и вызывающий
+        код рвёт цикл, не дожидаясь EOF (пайп мог остаться открыт у дочернего
+        процесса croc даже после terminate главного).
+        """
+        read_task = asyncio.ensure_future(stream.read(_CHUNK_SIZE))
+        cancel_task = asyncio.ensure_future(cancel_event.wait())
+        try:
+            await asyncio.wait(
+                {read_task, cancel_task}, return_when=asyncio.FIRST_COMPLETED
+            )
+        finally:
+            cancel_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await cancel_task
+        if cancel_event.is_set():
+            read_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await read_task
+            return None
+        return read_task.result()
 
     async def _write_stdin(self, data: bytes) -> None:
         proc = self._proc
