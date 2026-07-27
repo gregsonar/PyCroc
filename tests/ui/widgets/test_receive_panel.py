@@ -18,6 +18,7 @@ from pycroc.core.events import (
     ErrorEvent,
     Event,
     ProgressEvent,
+    TransferStartEvent,
 )
 from pycroc.core.options import CrocOptions
 from pycroc.storage.config import ConfigStore, Profile
@@ -260,6 +261,22 @@ async def test_done_event_records_receive_history(tmp_path: Path) -> None:
     assert record.status == "done"
     assert record.filename == "report.pdf"
     assert record.code == "slow-tomato-almond"
+
+
+async def test_transfer_start_size_stored_in_receive_history(tmp_path: Path) -> None:
+    """Пункт 9 конспекта: размер из TransferStartEvent попадает в size_bytes."""
+    history = FakeHistory()
+    runner = FakeRunner(
+        [TransferStartEvent(filename="report.pdf", size="2.1 MB"), DoneEvent()]
+    )
+    panel = make_panel(tmp_path, runner, history)
+    async with PanelApp(panel).run_test(size=(100, 35)):
+        panel.query_one("#receive-code", Input).value = "a-b-c"
+        panel.action_receive()
+        await wait_transfer(panel)
+
+    [record] = history.records
+    assert record.size_bytes == 2_100_000  # 2.1 MB (SI)
 
 
 async def test_error_event_records_error(tmp_path: Path) -> None:

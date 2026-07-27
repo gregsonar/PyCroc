@@ -18,22 +18,12 @@ from textual.widgets import Button, DataTable, Input
 from textual.worker import Worker
 
 from pycroc.core.options import normalize_text
+from pycroc.core.units import format_size
 from pycroc.storage.history import HistoryRepository, TransferRecord
 
 _SEARCH_DEBOUNCE_SECONDS = 0.3
 
 _DIRECTION_LABELS = {"send": "отправка", "receive": "приём"}
-
-
-def _format_size(size_bytes: int | None) -> str:
-    if size_bytes is None:
-        return "—"
-    size = float(size_bytes)
-    for unit in ("B", "kB", "MB"):
-        if size < 1024:
-            return f"{int(size)} B" if unit == "B" else f"{size:.1f} {unit}"
-        size /= 1024
-    return f"{size:.1f} GB"
 
 
 class HistoryPanel(Vertical):
@@ -98,7 +88,7 @@ class HistoryPanel(Vertical):
             table.add_row(
                 record.started_at.strftime("%Y-%m-%d %H:%M"),
                 record.filename,
-                _format_size(record.size_bytes),
+                format_size(record.size_bytes),
                 _DIRECTION_LABELS.get(record.direction, record.direction),
                 record.status,
                 key=key,

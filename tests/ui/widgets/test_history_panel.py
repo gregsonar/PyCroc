@@ -9,7 +9,7 @@ from textual.app import App, ComposeResult
 from textual.widgets import DataTable, Input
 
 from pycroc.storage.history import TransferRecord
-from pycroc.ui.widgets.history_panel import HistoryPanel, _format_size
+from pycroc.ui.widgets.history_panel import HistoryPanel
 
 # --- Fakes -----------------------------------------------------------------
 
@@ -82,6 +82,8 @@ async def test_table_populates_from_history_newest_first() -> None:
         assert table.row_count == 2
         assert table.get_row_at(0)[1] == "new.txt"
         assert table.get_row_at(1)[1] == "old.txt"
+        # колонка «Размер» показывает данные, а не прочерк (пункт 9 конспекта)
+        assert table.get_row_at(0)[2] == "116 B"
         assert table.get_row_at(0)[3] == "отправка"
 
 
@@ -174,13 +176,3 @@ async def test_buttons_do_not_crash_on_empty_table() -> None:
         await pilot.pause()
     # действий не произошло, предупреждения показаны, исключений нет
 
-
-# --- Форматирование размера ---------------------------------------------------------------
-
-
-def test_format_size() -> None:
-    assert _format_size(None) == "—"
-    assert _format_size(116) == "116 B"
-    assert _format_size(2048) == "2.0 kB"
-    assert _format_size(5 * 1024 * 1024) == "5.0 MB"
-    assert _format_size(3 * 1024 * 1024 * 1024) == "3.0 GB"

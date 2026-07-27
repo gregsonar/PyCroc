@@ -27,6 +27,7 @@ from pycroc.core.events import (
 from pycroc.core.exceptions import CrocError
 from pycroc.core.options import CrocOptions
 from pycroc.core.runner import CrocRunner
+from pycroc.core.units import parse_size
 from pycroc.storage.config import ConfigStore
 from pycroc.storage.history import HistoryRepository, TransferRecord, TransferStatus
 from pycroc.ui.widgets.file_picker import MultiSelectDirectoryTree
@@ -201,6 +202,7 @@ class SendPanel(Vertical):
         final_status: TransferStatus = "cancelled"
         error_message: str | None = None
         code_value = options.code or ""
+        size_bytes: int | None = None
         try:
             async for event in self._runner.send(paths, options):
                 if isinstance(event, CodeEvent):
@@ -214,6 +216,7 @@ class SendPanel(Vertical):
                     self.notify(f"Код передачи: {event.code}", timeout=10)
                     status_label.update("Ожидание получателя…")
                 elif isinstance(event, TransferStartEvent):
+                    size_bytes = parse_size(event.size)
                     status_label.update(f"Отправка {event.filename}…")
                 elif isinstance(event, ProgressEvent):
                     progress.update(progress=event.percent)
@@ -249,7 +252,7 @@ class SendPanel(Vertical):
                     id=None,
                     direction="send",
                     filename=filename,
-                    size_bytes=None,
+                    size_bytes=size_bytes,
                     code=code_value,
                     status=final_status,
                     started_at=started_at,

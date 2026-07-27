@@ -33,6 +33,7 @@ from pycroc.core.events import (
 from pycroc.core.exceptions import CrocError
 from pycroc.core.options import CrocOptions, normalize_text
 from pycroc.core.runner import CrocRunner
+from pycroc.core.units import parse_size
 from pycroc.storage.config import ConfigStore
 from pycroc.storage.history import HistoryRepository, TransferRecord, TransferStatus
 from pycroc.ui.widgets.overwrite_modal import OverwriteConflictModal
@@ -177,10 +178,12 @@ class ReceivePanel(Vertical):
         final_status: TransferStatus = "cancelled"
         error_message: str | None = None
         filename = ""
+        size_bytes: int | None = None
         try:
             async for event in self._runner.receive(code, options):
                 if isinstance(event, AcceptPromptEvent):
                     filename = event.filename
+                    size_bytes = parse_size(event.size)
                     accept = await self.app.push_screen_wait(
                         OverwriteConflictModal(event.filename, event.size)
                     )
@@ -188,6 +191,7 @@ class ReceivePanel(Vertical):
                     status_label.update("Приём…" if accept else "Отклонено")
                 elif isinstance(event, TransferStartEvent):
                     filename = event.filename
+                    size_bytes = parse_size(event.size)
                     status_label.update(f"Приём {event.filename}…")
                 elif isinstance(event, ProgressEvent):
                     filename = event.filename
@@ -221,7 +225,7 @@ class ReceivePanel(Vertical):
                     id=None,
                     direction="receive",
                     filename=filename or "?",
-                    size_bytes=None,
+                    size_bytes=size_bytes,
                     code=code,
                     status=final_status,
                     started_at=started_at,
