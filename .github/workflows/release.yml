@@ -1,0 +1,76 @@
+name: Release
+
+# ЗАГОТОВКА (draft). Триггер — пуш тега вида v1.2.3.
+# Собирает: wheel + sdist (для PyPI / pip install) и Windows-.exe
+# (PyInstaller onefile, запуск без установки Python).
+#
+# TODO перед боевым использованием:
+#   - публикация на PyPI (job publish-pypi) — включить, когда решён вопрос
+#     с именем/аккаунтом; использовать OIDC trusted publishing или
+#     секрет PYPI_API_TOKEN (Settings → Secrets). Claude токены не трогает.
+#   - подпись .exe (code signing) — иначе SmartScreen будет ругаться.
+#   - при необходимости добавить hidden-imports/--collect-all для textual,
+#     если PyInstaller не подхватит ресурсы автоматически.
+#   - croc в артефакт НЕ кладём: PyCroc ищет системный croc (см. README).
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write  # для создания GitHub Release с артефактами
+
+jobs:
+  build-wheel:
+    name: Build wheel + sdist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Build distributions
+        run: |
+          python -m pip install build
+          python -m build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-python
+          path: dist/*
+
+  build-windows-exe:
+    name: Build Windows .exe (PyInstaller)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install project + PyInstaller
+        run: |
+          python -m pip install .
+          python -m pip install pyinstaller
+      - name: Build onefile exe
+        # точка входа — src/pycroc/__main__.py (python -m pycroc)
+        run: >
+          pyinstaller --onefile --name pycroc
+          --collect-all textual
+          src/pycroc/__main__.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pycroc-windows-exe
+          path: dist/pycroc.exe
+
+  release:
+    name: Attach artifacts to GitHub Release
+    needs: [build-wheel, build-windows-exe]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Create/append GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
+          generate_release_notes: true
