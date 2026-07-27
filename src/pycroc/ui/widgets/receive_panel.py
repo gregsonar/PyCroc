@@ -38,6 +38,18 @@ from pycroc.storage.config import ConfigStore
 from pycroc.storage.history import HistoryRepository, TransferRecord, TransferStatus
 from pycroc.ui.widgets.overwrite_modal import OverwriteConflictModal
 
+_CONNECT_FAILED_HINT = "Не удалось подключиться — проверьте кодовую фразу и relay"
+
+
+def _failure_message(raw: str, connected: bool) -> str:
+    """Сообщение об ошибке для пользователя.
+
+    До подключения croc печатает лишь `connecting…/securing channel…` —
+    для пользователя это бесполезно, показываем понятную подсказку.
+    После подключения отдаём реальный текст ошибки croc.
+    """
+    return raw if connected else _CONNECT_FAILED_HINT
+
 
 class HistoryCodeSuggester(Suggester):
     """Инлайн-подсказка кодовой фразы из истории передач (новые — раньше)."""
@@ -179,9 +191,14 @@ class ReceivePanel(Vertical):
         error_message: str | None = None
         filename = ""
         size_bytes: int | None = None
+        # дошли ли до реального обмена: если ошибка случилась ДО подключения,
+        # сырой текст croc («connecting…/securing channel…») бесполезен —
+        # показываем понятную подсказку (пункт 13 конспекта)
+        connected = False
         try:
             async for event in self._runner.receive(code, options):
                 if isinstance(event, AcceptPromptEvent):
+                    connected = True
                     filename = event.filename
                     size_bytes = parse_size(event.size)
                     accept = await self.app.push_screen_wait(
@@ -190,10 +207,12 @@ class ReceivePanel(Vertical):
                     await self._runner.respond(accept)
                     status_label.update("Приём…" if accept else "Отклонено")
                 elif isinstance(event, TransferStartEvent):
+                    connected = True
                     filename = event.filename
                     size_bytes = parse_size(event.size)
                     status_label.update(f"Приём {event.filename}…")
                 elif isinstance(event, ProgressEvent):
+                    connected = True
                     filename = event.filename
                     progress.update(progress=event.percent)
                     rate_label.update(event.rate)
@@ -203,14 +222,14 @@ class ReceivePanel(Vertical):
                     status_label.update("Готово")
                 elif isinstance(event, ErrorEvent):
                     final_status = "error"
-                    error_message = event.message
+                    error_message = _failure_message(event.message, connected)
                     status_label.update("Ошибка")
-                    self.notify(event.message, severity="error")
+                    self.notify(error_message, severity="error")
         except CrocError as exc:
             final_status = "error"
-            error_message = str(exc)
+            error_message = _failure_message(str(exc), connected)
             status_label.update("Ошибка")
-            self.notify(str(exc), severity="error")
+            self.notify(error_message, severity="error")
         finally:
             # Панель могла быть размонтирована посреди передачи — виджетов
             # уже нет, но запись в историю всё равно нужна

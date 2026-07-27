@@ -24,7 +24,12 @@ from pycroc.core.options import CrocOptions
 from pycroc.storage.config import ConfigStore, Profile
 from pycroc.storage.history import TransferRecord
 from pycroc.ui.widgets.overwrite_modal import OverwriteConflictModal
-from pycroc.ui.widgets.receive_panel import HistoryCodeSuggester, ReceivePanel
+from pycroc.ui.widgets.receive_panel import (
+    _CONNECT_FAILED_HINT,
+    HistoryCodeSuggester,
+    ReceivePanel,
+    _failure_message,
+)
 
 # --- Fakes -----------------------------------------------------------------
 
@@ -279,9 +284,30 @@ async def test_transfer_start_size_stored_in_receive_history(tmp_path: Path) -> 
     assert record.size_bytes == 2_100_000  # 2.1 MB (SI)
 
 
-async def test_error_event_records_error(tmp_path: Path) -> None:
+async def test_error_before_connect_shows_friendly_hint(tmp_path: Path) -> None:
+    """Пункт 13: ошибка ДО подключения → понятная подсказка, не сырой croc."""
     history = FakeHistory()
-    runner = FakeRunner([ErrorEvent(message="room not ready")])
+    runner = FakeRunner([ErrorEvent(message="connecting...\nsecuring channel...")])
+    panel = make_panel(tmp_path, runner, history)
+    app = PanelApp(panel)
+    async with app.run_test(size=(100, 35)):
+        panel.query_one("#receive-code", Input).value = "a-b-c"
+        panel.action_receive()
+        await wait_transfer(panel)
+
+    [record] = history.records
+    assert record.status == "error"
+    assert record.error_message == _CONNECT_FAILED_HINT
+    assert any(_CONNECT_FAILED_HINT in n.message for n in app._notifications)
+
+
+async def test_error_after_connect_keeps_raw_message(tmp_path: Path) -> None:
+    """Если обмен уже начался, показываем реальную ошибку croc, не подсказку."""
+    history = FakeHistory()
+    runner = FakeRunner([
+        ProgressEvent(direction="Receiving", filename="f.bin", percent=40, rate="1 MB/s"),
+        ErrorEvent(message="write error: disk full"),
+    ])
     panel = make_panel(tmp_path, runner, history)
     async with PanelApp(panel).run_test(size=(100, 35)):
         panel.query_one("#receive-code", Input).value = "a-b-c"
@@ -290,7 +316,12 @@ async def test_error_event_records_error(tmp_path: Path) -> None:
 
     [record] = history.records
     assert record.status == "error"
-    assert record.error_message == "room not ready"
+    assert record.error_message == "write error: disk full"
+
+
+def test_failure_message_helper() -> None:
+    assert _failure_message("connecting...", connected=False) == _CONNECT_FAILED_HINT
+    assert _failure_message("disk full", connected=True) == "disk full"
 
 
 # --- Автодополнение из истории --------------------------------------------------------
