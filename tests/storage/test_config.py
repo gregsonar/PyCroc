@@ -126,6 +126,18 @@ def test_set_and_get_binary_path(tmp_path: Path) -> None:
     assert _store(tmp_path).get_binary_path() == "C:/tools/croc.exe"
 
 
+# --- тема оформления -------------------------------------------------------------------
+
+
+def test_theme_defaults_to_none(tmp_path: Path) -> None:
+    assert _store(tmp_path).get_theme() is None
+
+
+def test_set_and_get_theme(tmp_path: Path) -> None:
+    _store(tmp_path).set_theme("gruvbox")
+    assert _store(tmp_path).get_theme() == "gruvbox"
+
+
 # --- повреждённый файл ------------------------------------------------------------------
 
 

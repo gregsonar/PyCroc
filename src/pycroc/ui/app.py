@@ -23,6 +23,7 @@ from pathlib import Path
 import platformdirs
 from textual import on
 from textual.app import App, ComposeResult
+from textual.theme import Theme
 from textual.widgets import Footer, Header, Input, TabbedContent, TabPane
 
 from pycroc.core.exceptions import CrocNotFoundError
@@ -87,6 +88,9 @@ class PyCrocApp(App[None]):
         yield Footer()
 
     async def on_mount(self) -> None:
+        self._restore_theme()
+        # запоминать выбор темы (Ctrl+P → Change theme) между сессиями
+        self.theme_changed_signal.subscribe(self, self._on_theme_changed)
         if self._config_error is not None:
             self.notify(
                 f"Файл конфигурации повреждён и проигнорирован: {self._config_error}",
@@ -103,6 +107,17 @@ class PyCrocApp(App[None]):
                 timeout=10,
             )
             self._set_transfer_tabs_enabled(False)
+
+    def _restore_theme(self) -> None:
+        """Ставит сохранённую тему; неизвестную (пропала в новой Textual или
+        мусор в конфиге) игнорирует — иначе ``self.theme =`` бросит
+        ``InvalidThemeError``, как и повреждённый конфиг, роняя старт."""
+        saved = self.config.get_theme()
+        if saved is not None and saved in self.available_themes:
+            self.theme = saved
+
+    def _on_theme_changed(self, theme: Theme) -> None:
+        self.config.set_theme(theme.name)
 
     def _set_transfer_tabs_enabled(self, enabled: bool) -> None:
         tabbed = self.query_one(TabbedContent)

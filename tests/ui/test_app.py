@@ -18,6 +18,10 @@ MISSING_BINARY = "definitely-missing-croc-binary-xyz"
 def _app(tmp_path: Path, binary: str) -> PyCrocApp:
     config = ConfigStore(tmp_path / "config.toml")
     config.set_binary_path(binary)
+    return _app_with_config(tmp_path, config)
+
+
+def _app_with_config(tmp_path: Path, config: ConfigStore) -> PyCrocApp:
     return PyCrocApp(
         config=config,
         history=HistoryRepository(tmp_path / "history.db"),
@@ -77,3 +81,34 @@ async def test_corrupted_config_warns_and_app_survives(tmp_path: Path) -> None:
         await pilot.pause()
         assert any("повреждён" in message for message in _notification_messages(app))
         assert app.is_running
+
+
+async def test_saved_theme_is_restored_on_start(tmp_path: Path) -> None:
+    config = ConfigStore(tmp_path / "config.toml")
+    config.set_theme("gruvbox")
+    app = _app_with_config(tmp_path, config)
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        assert app.theme == "gruvbox"
+
+
+async def test_changing_theme_persists_to_config(tmp_path: Path) -> None:
+    config = ConfigStore(tmp_path / "config.toml")
+    app = _app_with_config(tmp_path, config)
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        app.theme = "nord"
+        await pilot.pause()
+    # новый экземпляр ConfigStore видит записанную тему
+    assert ConfigStore(tmp_path / "config.toml").get_theme() == "nord"
+
+
+async def test_unknown_saved_theme_is_ignored_without_crash(tmp_path: Path) -> None:
+    config = ConfigStore(tmp_path / "config.toml")
+    config.set_theme("theme-from-the-future-that-does-not-exist")
+    app = _app_with_config(tmp_path, config)
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        # неизвестная тема проигнорирована, приложение живо, тема — дефолтная
+        assert app.is_running
+        assert app.theme in app.available_themes

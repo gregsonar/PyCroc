@@ -189,6 +189,17 @@ class ConfigStore:
         doc["binary_path"] = path
         self._write(doc)
 
+    def get_theme(self) -> str | None:
+        """Сохранённое имя темы Textual или ``None`` (тогда — дефолт Textual)."""
+        doc = self._read_document()
+        theme = doc.get("theme")
+        return theme if isinstance(theme, str) and theme else None
+
+    def set_theme(self, theme: str) -> None:
+        doc = self._read_document()
+        doc["theme"] = theme
+        self._write(doc)
+
     def _read_document(self) -> TOMLDocument:
         self.last_load_error = None
         if not self._config_path.exists():
