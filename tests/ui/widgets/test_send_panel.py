@@ -23,7 +23,7 @@ from pycroc.storage.config import ConfigStore, Profile
 from pycroc.storage.history import TransferRecord
 from pycroc.ui.widgets.file_picker import MultiSelectDirectoryTree
 from pycroc.ui.widgets.qr_code import QrCodeWidget
-from pycroc.ui.widgets.send_panel import SendPanel
+from pycroc.ui.widgets.send_panel import SendPanel, selected_total_size
 
 # --- Fakes -----------------------------------------------------------------
 
@@ -291,6 +291,45 @@ async def test_form_defaults_come_from_active_profile(tmp_path: Path) -> None:
 
 
 # --- Фиксы конспекта ручного тестирования ---------------------------------------------
+
+
+# --- Размер выбранного до отправки (пункт 9 конспекта) --------------------------------
+
+
+def test_selected_total_size_sums_files_and_dirs(tmp_path: Path) -> None:
+    (tmp_path / "a.txt").write_bytes(b"x" * 100)
+    sub = tmp_path / "sub"
+    sub.mkdir()
+    (sub / "b.bin").write_bytes(b"y" * 250)
+    (sub / "c.bin").write_bytes(b"z" * 400)
+    # файл + папка (рекурсивно)
+    assert selected_total_size([str(tmp_path / "a.txt"), str(sub)]) == 100 + 250 + 400
+
+
+def test_selected_total_size_skips_missing(tmp_path: Path) -> None:
+    assert selected_total_size([str(tmp_path / "nope.txt")]) == 0
+
+
+async def test_selection_size_label_updates_on_toggle(tmp_path: Path) -> None:
+    panel, file_path = make_panel(tmp_path, FakeRunner([]))  # file.txt = "hello" = 5 B
+    async with PanelApp(panel).run_test(size=(120, 40)) as pilot:
+        label = panel.query_one("#send-selection-size", Label)
+        assert str(label.render()) == "Выбрано: ничего"
+
+        panel.query_one(MultiSelectDirectoryTree).toggle(file_path)
+        for _ in range(30):
+            await pilot.pause(0.05)  # больше debounce (0.15) за несколько итераций
+            if "5 B" in str(label.render()):
+                break
+        assert "5 B" in str(label.render())
+        assert "1 объект" in str(label.render())
+
+        panel.query_one(MultiSelectDirectoryTree).toggle(file_path)  # снятие
+        for _ in range(30):
+            await pilot.pause(0.05)
+            if str(label.render()) == "Выбрано: ничего":
+                break
+        assert str(label.render()) == "Выбрано: ничего"
 
 
 async def test_arrow_keys_move_focus_between_form_fields(tmp_path: Path) -> None:

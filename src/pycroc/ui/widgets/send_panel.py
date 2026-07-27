@@ -7,6 +7,9 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -14,6 +17,7 @@ from textual import on
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.css.query import NoMatches
+from textual.timer import Timer
 from textual.widgets import Button, Label, ProgressBar
 from textual.worker import Worker
 
@@ -27,12 +31,35 @@ from pycroc.core.events import (
 from pycroc.core.exceptions import CrocError
 from pycroc.core.options import CrocOptions
 from pycroc.core.runner import CrocRunner
-from pycroc.core.units import parse_size
+from pycroc.core.units import format_size, parse_size
 from pycroc.storage.config import ConfigStore
 from pycroc.storage.history import HistoryRepository, TransferRecord, TransferStatus
 from pycroc.ui.widgets.file_picker import MultiSelectDirectoryTree
 from pycroc.ui.widgets.options_form import OptionsForm
 from pycroc.ui.widgets.qr_code import QrCodeWidget
+
+_SIZE_DEBOUNCE_SECONDS = 0.15
+
+
+def selected_total_size(paths: list[str]) -> int:
+    """Суммарный размер путей в байтах (файлы + рекурсивный обход папок).
+
+    Недоступные/исчезнувшие файлы молча пропускаются — размер это оценка
+    для превью, а не источник истины. Блокирующий I/O: вызывать через
+    ``asyncio.to_thread``, чтобы не морозить UI на больших деревьях.
+    """
+    total = 0
+    for raw in paths:
+        path = Path(raw)
+        if path.is_dir():
+            for root, _dirs, files in os.walk(path):
+                for name in files:
+                    with contextlib.suppress(OSError):
+                        total += os.path.getsize(os.path.join(root, name))
+        else:
+            with contextlib.suppress(OSError):
+                total += path.stat().st_size
+    return total
 
 
 class SendPanel(Vertical):
@@ -101,12 +128,15 @@ class SendPanel(Vertical):
         #: worker-ы приложения (у DirectoryTree есть вечный загрузчик)
         self.transfer_worker: Worker[None] | None = None
         self._current_code: str | None = None
+        self._size_timer: Timer | None = None
+        self._pending_size_paths: list[str] = []
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="send-layout"):
             with Vertical(id="send-left"):
                 yield Label("Файлы и папки (space — выбрать):")
                 yield MultiSelectDirectoryTree(self._start_path, id="file-picker")
+                yield Label("Выбрано: ничего", id="send-selection-size")
                 with Horizontal(classes="buttons"):
                     yield Button("Отправить", variant="primary", id="send-button")
                     yield Button("Отменить", id="cancel-button", disabled=True)
@@ -163,6 +193,32 @@ class SendPanel(Vertical):
             self.notify("Нет отмеченных файлов", severity="warning")
             return
         tree.clear_selection()
+
+    @on(MultiSelectDirectoryTree.SelectionChanged)
+    def _selection_changed(self, event: MultiSelectDirectoryTree.SelectionChanged) -> None:
+        # debounce: быстрые переключения коалесцируются в один пересчёт
+        # (как поиск в History) — не гоняем обход дерева на каждый toggle
+        self._pending_size_paths = event.paths
+        if self._size_timer is not None:
+            self._size_timer.stop()
+        self._size_timer = self.set_timer(_SIZE_DEBOUNCE_SECONDS, self._recompute_size)
+
+    def _recompute_size(self) -> None:
+        # обход папок может быть небыстрым — считаем в потоке, не морозя UI
+        self.run_worker(
+            self._update_selection_size(self._pending_size_paths),
+            exclusive=True,
+            group="send-selection-size",
+        )
+
+    async def _update_selection_size(self, paths: list[str]) -> None:
+        label = self.query_one("#send-selection-size", Label)
+        if not paths:
+            label.update("Выбрано: ничего")
+            return
+        total = await asyncio.to_thread(selected_total_size, paths)
+        noun = "объект" if len(paths) == 1 else "объектов"
+        label.update(f"Выбрано: {len(paths)} {noun}, {format_size(total)}")
 
     def action_send(self) -> None:
         paths = self.query_one(MultiSelectDirectoryTree).selected_paths()

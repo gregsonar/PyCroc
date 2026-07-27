@@ -16,6 +16,7 @@ from rich.style import Style
 from rich.text import Text
 from textual import on
 from textual.binding import Binding, BindingType
+from textual.message import Message
 from textual.widgets import DirectoryTree
 from textual.widgets.directory_tree import DirEntry
 from textual.widgets.tree import TreeNode
@@ -27,6 +28,13 @@ class MultiSelectDirectoryTree(DirectoryTree):
     Отметка: space на любом узле, либо клик/Enter по файлу (клик по папке —
     стандартное разворачивание).
     """
+
+    class SelectionChanged(Message):
+        """Набор отмеченных путей изменился (для пересчёта размера в SendPanel)."""
+
+        def __init__(self, paths: list[str]) -> None:
+            super().__init__()
+            self.paths = paths
 
     BINDINGS: ClassVar[list[BindingType]] = [
         # не "Отметить": визуально путается с "Отменить" (пункт 6 конспекта)
@@ -48,10 +56,12 @@ class MultiSelectDirectoryTree(DirectoryTree):
         else:
             self._selected.add(path)
         self._refresh_labels()
+        self.post_message(self.SelectionChanged(self.selected_paths()))
 
     def clear_selection(self) -> None:
         self._selected.clear()
         self._refresh_labels()
+        self.post_message(self.SelectionChanged(self.selected_paths()))
 
     def _refresh_labels(self) -> None:
         # Tree кеширует отрендеренные метки; ключ кеша включает счётчик
