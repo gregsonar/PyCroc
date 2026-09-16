@@ -176,6 +176,34 @@ async def test_code_and_progress_events_update_widgets(tmp_path: Path) -> None:
         await wait_transfer(panel)
 
 
+async def test_v11_duplicate_code_events_notify_once(tmp_path: Path) -> None:
+    """croc v11 печатает код дважды (строка-инструкция + URL) -> парсер даёт два
+    CodeEvent с одним кодом; UI реагирует ровно один раз (дедуп по коду)."""
+    runner = FakeRunner(
+        [CodeEvent(code="move-femur-yummy"), CodeEvent(code="move-femur-yummy")],
+        hold=True,
+    )
+    panel, file_path = make_panel(tmp_path, runner)
+    code_notifications: list[str] = []
+
+    def capture_notify(message: str, *args: object, **kwargs: object) -> None:
+        code_notifications.append(message)
+
+    async with PanelApp(panel).run_test(size=(120, 40)) as pilot:
+        panel.notify = capture_notify  # type: ignore[method-assign]
+        panel.query_one(MultiSelectDirectoryTree).toggle(file_path)
+        panel.action_send()
+        await pilot.pause()
+
+        assert panel.query_one(QrCodeWidget).code == "move-femur-yummy"
+        assert [m for m in code_notifications if "move-femur-yummy" in m] == [
+            "Код передачи: move-femur-yummy"
+        ]
+
+        panel.action_cancel()
+        await wait_transfer(panel)
+
+
 # --- Запись в историю ------------------------------------------------------------
 
 

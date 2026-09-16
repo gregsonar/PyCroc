@@ -22,6 +22,25 @@ def test_code_line() -> None:
     assert parse_line("Code is: slow-tomato-almond") == CodeEvent(code="slow-tomato-almond")
 
 
+def test_v11_code_run_line() -> None:
+    # croc v11.5.0 убрал "Code is:"; код виден в строке-инструкции с суффиксом
+    line = "  croc mash-rank-scold (code copied to clipboard)"
+    assert parse_line(line) == CodeEvent(code="mash-rank-scold")
+
+
+def test_v11_code_url_line() -> None:
+    # тот же код дублируется в URL веб-получателя
+    line = "  https://getcroc.com/?code=mash-rank-scold"
+    assert parse_line(line) == CodeEvent(code="mash-rank-scold")
+
+
+def test_bare_run_instruction_without_clipboard_suffix_is_none() -> None:
+    # голая инструкция "croc <code>" (v8/v9/v10) НЕ должна давать CodeEvent:
+    # там код уже пришёл строкой "Code is:", а тут мы избегаем дубля
+    assert parse_line("croc slow-tomato-almond") is None
+    assert parse_line("    croc 0625-earth-python-siren") is None
+
+
 def test_receiving_progress_line_with_checkmark() -> None:
     line = (
         "Receiving (<-192.168.225.37:9009) file.txt 100% "
@@ -93,6 +112,31 @@ def test_unknown_line_returns_none() -> None:
     assert parse_line("some future unknown croc output format") is None
 
 
+# --- croc v11 «add color»: ANSI-раскраска снимается перед разбором ---------------
+
+
+def test_ansi_colored_code_line_is_stripped() -> None:
+    # v11 печатает код жёлтым; парсер снимает SGR и матчит как обычно
+    line = "\x1b[33mCode is: slow-tomato-almond\x1b[0m"
+    assert parse_line(line) == CodeEvent(code="slow-tomato-almond")
+
+
+def test_ansi_colored_progress_line_v11() -> None:
+    # SGR вокруг имени файла (bold) и скорости (cyan) не должны ломать паттерн
+    line = (
+        "\x1b[1mpayload.bin\x1b[0m 100% |████████████████████| "
+        "(524/524 kB, \x1b[36m131 MB/s\x1b[0m)"
+    )
+    assert parse_line(line) == ProgressEvent(
+        direction="", filename="payload.bin", percent=100, rate="131 MB/s"
+    )
+
+
+def test_ansi_only_line_returns_none() -> None:
+    # строка из одних управляющих последовательностей после зачистки пуста
+    assert parse_line("\x1b[2K\x1b[0m") is None
+
+
 def test_blank_line_returns_none() -> None:
     assert parse_line("") is None
     assert parse_line("   ") is None
@@ -136,6 +180,11 @@ def test_fixture_corpus_event_sequence() -> None:
         None,  # Receiving (<-127.0.0.1:42731)
         ProgressEvent,  # v10: 0%, без скорости
         ProgressEvent,  # v10: 100%, со скоростью, без [0s:0s]
+        # --- реальный захват croc v11.5.0: "Code is:" убран ---
+        None,  # On the other computer, run:
+        CodeEvent,  # croc move-femur-yummy (code copied to clipboard)
+        None,  # Or open:
+        CodeEvent,  # https://getcroc.com/?code=move-femur-yummy
     ]
     assert len(lines) == len(expected), "фикстура и список ожиданий рассинхронизированы"
     got = [type(e) if (e := parse_line(line)) is not None else None for line in lines]

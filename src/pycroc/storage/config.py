@@ -50,7 +50,10 @@ def _options_to_table(opts: CrocOptions) -> dict[str, object]:
         ("connect", opts.connect),
         ("throttle_upload", opts.throttle_upload),
         ("curve", opts.curve),
+        ("transport", opts.transport),
         ("hash_algo", opts.hash_algo),
+        ("store_expiration", opts.store_expiration),
+        ("store_url", opts.store_url),
     )
     for key, value in text_fields:
         if value is not None:
@@ -58,9 +61,12 @@ def _options_to_table(opts: CrocOptions) -> dict[str, object]:
     table["no_compress"] = opts.no_compress
     table["ask"] = opts.ask
     table["auto_accept"] = opts.auto_accept
+    table["store"] = opts.store
     table["exclude"] = list(opts.exclude)
     if opts.transfers is not None:
         table["transfers"] = opts.transfers
+    if opts.store_downloads is not None:
+        table["store_downloads"] = opts.store_downloads
     return table
 
 
@@ -81,12 +87,10 @@ def _options_from_table(data: Mapping[str, object]) -> CrocOptions:
         if isinstance(exclude_raw, list | tuple)
         else ()
     )
-    transfers_raw = data.get("transfers")
-    transfers = (
-        transfers_raw
-        if isinstance(transfers_raw, int) and not isinstance(transfers_raw, bool)
-        else None
-    )
+    def opt_int(key: str) -> int | None:
+        value = data.get(key)
+        return value if isinstance(value, int) and not isinstance(value, bool) else None
+
     return CrocOptions(
         code=opt_str("code"),
         pass_=opt_str("pass"),
@@ -97,12 +101,17 @@ def _options_from_table(data: Mapping[str, object]) -> CrocOptions:
         connect=opt_str("connect"),
         throttle_upload=opt_str("throttle_upload"),
         curve=opt_str("curve"),
+        transport=opt_str("transport"),
         hash_algo=opt_str("hash_algo"),
         no_compress=opt_bool("no_compress", False),
         ask=opt_bool("ask", False),
         auto_accept=opt_bool("auto_accept", True),
         exclude=exclude,
-        transfers=transfers,
+        transfers=opt_int("transfers"),
+        store=opt_bool("store", False),
+        store_downloads=opt_int("store_downloads"),
+        store_expiration=opt_str("store_expiration"),
+        store_url=opt_str("store_url"),
     )
 
 

@@ -42,9 +42,14 @@ def parse_send_argv(argv: list[str]) -> tuple[CrocOptions, list[str]]:
     global_ns = global_parser.parse_args(argv[:split])
 
     send_parser = argparse.ArgumentParser(exit_on_error=False)
+    send_parser.add_argument("--transport")
     send_parser.add_argument("--hash", dest="hash_algo")
     send_parser.add_argument("--exclude")
     send_parser.add_argument("--transfers", type=int)
+    send_parser.add_argument("--store", action="store_true")
+    send_parser.add_argument("--store-downloads", dest="store_downloads", type=int)
+    send_parser.add_argument("--store-expiration", dest="store_expiration")
+    send_parser.add_argument("--store-url", dest="store_url")
     send_parser.add_argument("paths", nargs="*")
     send_ns = send_parser.parse_args(argv[split + 1 :])
 
@@ -59,12 +64,17 @@ def parse_send_argv(argv: list[str]) -> tuple[CrocOptions, list[str]]:
         connect=global_ns.connect,
         throttle_upload=global_ns.throttle_upload,
         curve=global_ns.curve,
+        transport=send_ns.transport,
         hash_algo=send_ns.hash_algo,
         no_compress=global_ns.no_compress,
         ask=global_ns.ask,
         auto_accept=global_ns.yes,
         exclude=tuple(send_ns.exclude.split(",")) if send_ns.exclude else (),
         transfers=send_ns.transfers,
+        store=send_ns.store,
+        store_downloads=send_ns.store_downloads,
+        store_expiration=send_ns.store_expiration,
+        store_url=send_ns.store_url,
     )
     return opts, list(send_ns.paths)
 
@@ -163,13 +173,66 @@ def test_send_ignores_out_dir() -> None:
 
 
 def test_receive_ignores_send_only_fields() -> None:
-    opts = CrocOptions(code="custom-code", exclude=("x",), transfers=8, hash_algo="imohash")
+    opts = CrocOptions(
+        code="custom-code",
+        transport="relay",
+        exclude=("x",),
+        transfers=8,
+        hash_algo="imohash",
+        store=True,
+        store_downloads=5,
+        store_expiration="3d",
+        store_url="https://getcroc.com",
+    )
     args = build_receive_args(opts)
     assert "--code" not in args
     assert "--exclude" not in args
     assert "--transfers" not in args
-    # --hash — флаг подкоманды send; у приёма его нет, croc упал бы
+    # --hash и --transport — флаги подкоманды send; у приёма их нет, croc упал бы
     assert "--hash" not in args
+    assert "--transport" not in args
+    # stored-передача (croc v11.1) — тоже только send
+    assert not any(a.startswith("--store") for a in args)
+
+
+# --- --transport: флаг подкоманды send (croc v11.3) ----------------------------
+
+
+def test_transport_is_send_subcommand_flag() -> None:
+    # проверено на реальном croc v11.5.0: --transport — флаг ПОДКОМАНДЫ send,
+    # поставленный до send валит croc ("flag provided but not defined")
+    args = build_send_args(CrocOptions(transport="derp"), ["f"])
+    assert args.index("send") < args.index("--transport")
+    assert args[args.index("--transport") + 1] == "derp"
+
+
+def test_transport_never_on_receive() -> None:
+    # у приёма подкоманды send нет — флаг transport к нему неприменим
+    assert "--transport" not in build_receive_args(CrocOptions(transport="relay"))
+
+
+def test_none_transport_omits_flag() -> None:
+    assert "--transport" not in build_send_args(CrocOptions(), ["f"])
+    assert "--transport" not in build_receive_args(CrocOptions())
+
+
+# --- stored-передача: флаги подкоманды send (croc v11.1) ----------------------
+
+
+def test_store_flag_added_only_when_enabled() -> None:
+    assert "--store" not in build_send_args(CrocOptions(store=False), ["f"])
+    args = build_send_args(CrocOptions(store=True), ["f"])
+    assert "--store" in args
+    assert args.index("send") < args.index("--store")
+
+
+def test_store_downloads_and_expiration_follow_send() -> None:
+    args = build_send_args(
+        CrocOptions(store=True, store_downloads=5, store_expiration="3d"), ["f"]
+    )
+    assert args[args.index("--store-downloads") + 1] == "5"
+    assert args[args.index("--store-expiration") + 1] == "3d"
+    assert args.index("send") < args.index("--store-downloads")
 
 
 def test_none_fields_produce_no_flags() -> None:
@@ -210,12 +273,17 @@ def test_send_round_trip_all_fields() -> None:
         connect="proxy.example.com:8080",
         throttle_upload="500k",
         curve="p521",
+        transport="derp",
         hash_algo="imohash",
         no_compress=True,
         ask=True,
         auto_accept=True,
         exclude=("node_modules", ".git", "*.log"),
         transfers=8,
+        store=True,
+        store_downloads=5,
+        store_expiration="3d",
+        store_url="https://getcroc.com",
     )
     paths = ["report.pdf", "photos/"]
     parsed_opts, parsed_paths = parse_send_argv(build_send_args(opts, paths))
@@ -232,8 +300,8 @@ def test_send_round_trip_drops_code_from_argv() -> None:
 
 
 def test_receive_round_trip_all_fields() -> None:
-    # Send-only поля (code/hash_algo/exclude/transfers) не участвуют:
-    # receive их игнорирует.
+    # Send-only поля (code/transport/hash_algo/exclude/transfers/store*)
+    # не участвуют: receive их игнорирует.
     opts = CrocOptions(
         pass_="s3cret",
         relay="relay.example.com:9009",

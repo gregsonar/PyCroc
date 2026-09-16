@@ -32,12 +32,21 @@ class CrocOptions:
     connect: str | None = None  # --connect (http-proxy)
     throttle_upload: str | None = None  # --throttleUpload, напр. "500k"
     curve: str | None = None  # p256 | p384 | p521 | siec | ed25519 (croc v10)
+    # --transport: auto | derp | relay (croc v11.3, флаг подкоманды send —
+    # это выбор ОТПРАВИТЕЛЯ, у приёма такого флага нет)
+    transport: str | None = None
     hash_algo: str | None = None  # xxhash | imohash | md5 (только send)
     no_compress: bool = False
     ask: bool = False
     auto_accept: bool = True  # управляет --yes И реакцией на AcceptPromptEvent
     exclude: tuple[str, ...] = field(default_factory=tuple)
     transfers: int | None = None
+    # Stored-передача (croc v11.1, только send): один зашифрованный upload
+    # обслуживает несколько получателей по ссылке/токену в течение срока жизни.
+    store: bool = False  # --store
+    store_downloads: int | None = None  # --store-downloads N (число выдач)
+    store_expiration: str | None = None  # --store-expiration, напр. "3d"
+    store_url: str | None = None  # --store-url (по умолчанию https://getcroc.com)
 
 
 def normalize_text(value: str | None) -> str | None:
@@ -86,10 +95,12 @@ def build_send_args(opts: CrocOptions, paths: Sequence[str]) -> list[str]:
     """Полный хвост argv для отправки: ``croc <результат>``.
 
     Возвращает ``[<глобальные флаги>, "send", <флаги send>, <paths...>]``.
-    Флаги подкоманды ``send``: ``--hash``, ``--exclude``, ``--transfers``.
-    Поле ``out_dir`` игнорируется (имеет смысл только при приёме).
-    ``exclude`` croc принимает одной строкой через запятую — флаг
-    ``--exclude`` добавляется ровно один раз.
+    Флаги подкоманды ``send``: ``--transport`` (croc v11.3, выбор транспорта
+    отправителем), ``--hash``, ``--exclude``, ``--transfers``,
+    ``--store``/``--store-downloads``/``--store-expiration``/``--store-url``
+    (stored-передача croc v11.1). Поле ``out_dir`` игнорируется (имеет смысл
+    только при приёме). ``exclude`` croc принимает одной строкой через запятую —
+    флаг ``--exclude`` добавляется ровно один раз.
 
     Кодовая фраза (``opts.code``) в argv НЕ попадает: она передаётся через
     переменную окружения ``CROC_SECRET`` (см. :func:`croc_secret_env`),
@@ -101,12 +112,22 @@ def build_send_args(opts: CrocOptions, paths: Sequence[str]) -> list[str]:
     вечно. Приёму флаг ставить нельзя: там stdin нужен для ответов y/n.
     """
     args = [*_global_args(opts), "--ignore-stdin", "send"]
+    if opts.transport is not None:
+        args.extend(("--transport", opts.transport))
     if opts.hash_algo is not None:
         args.extend(("--hash", opts.hash_algo))
     if opts.exclude:
         args.extend(("--exclude", ",".join(opts.exclude)))
     if opts.transfers is not None:
         args.extend(("--transfers", str(opts.transfers)))
+    if opts.store:
+        args.append("--store")
+    if opts.store_downloads is not None:
+        args.extend(("--store-downloads", str(opts.store_downloads)))
+    if opts.store_expiration is not None:
+        args.extend(("--store-expiration", opts.store_expiration))
+    if opts.store_url is not None:
+        args.extend(("--store-url", opts.store_url))
     args.extend(paths)
     return args
 
@@ -117,9 +138,9 @@ def build_receive_args(opts: CrocOptions) -> list[str]:
     Приём у croc — без подкоманды и БЕЗ позиционной кодовой фразы: код
     передаётся через ``CROC_SECRET`` (см. :func:`croc_secret_env`), при
     установленной переменной croc с пустым позиционным аргументом уходит
-    в приём. Send-only поля (``opts.code``, ``hash_algo``, ``exclude``,
-    ``transfers``) игнорируются: у приёма таких флагов нет, и croc упал бы
-    на неизвестном флаге.
+    в приём. Send-only поля (``opts.code``, ``transport``, ``hash_algo``,
+    ``exclude``, ``transfers`` и ``store*``) игнорируются: у приёма таких флагов
+    нет, и croc упал бы на неизвестном флаге.
     """
     args = _global_args(opts)
     if opts.out_dir is not None:
