@@ -19,7 +19,16 @@ from pycroc.core.events import (
     TransferStartEvent,
 )
 
+# v8/v9/v10 печатали отдельную строку "Code is: <code>".
 CODE_RE = re.compile(r"^Code is:\s*(?P<code>\S+)")
+# croc v11 (проверено на v11.5.0) строку "Code is:" УБРАЛ — код теперь виден
+# только в строке-инструкции "croc <code> (code copied to clipboard)" и в URL
+# "https://getcroc.com/?code=<code>". Матчим обе (взаимный дубликат гасит UI по
+# совпадению кода). Суффикс "(code copied...)" ОБЯЗАТЕЛЕН в паттерне run-строки:
+# он отличает её от голой инструкции "croc <code>" старых версий (та остаётся
+# None, чтобы не плодить ложные CodeEvent на v10).
+CODE_V11_RUN_RE = re.compile(r"^croc\s+(?P<code>\S+)\s+\(code copied to clipboard\)")
+CODE_V11_URL_RE = re.compile(r"getcroc\.com/\?code=(?P<code>[\w-]+)")
 # v10 печатает стартовую строку и у приёмника: "Receiving 'file' (512.0 kB)"
 TRANSFER_INIT_RE = re.compile(
     r"^(?:Sending|Receiving) '(?P<name>.+)' \((?P<size>[\d.]+\s?\w+)\)"
@@ -48,16 +57,27 @@ PROGRESS_V10_RE = re.compile(
 ERROR_RE = re.compile(r"^(?:[Ee]rror\b|failed to\b)")
 
 _LINE_SEP_RE = re.compile(rb"\r\n|\r|\n")
+# croc v11 (v11.0.0, «add color») печатает коды, имена файлов, прогресс и
+# ошибки с ANSI-раскраской. Для перенаправленного/пайпового вывода croc её сам
+# отключает (TTY-зависимо, уважает NO_COLOR), а CrocRunner читает stderr через
+# PIPE — но зачистка CSI-последовательностей делает парсер устойчивым и к цвету
+# (напр. croc под псевдо-TTY): все паттерны ниже заякорены на ^ и порвались бы
+# на ведущем ESC. Совпадает только с управляющими escape, не с данными croc.
+_ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
 
 
 def parse_line(line: str) -> Event | None:
     """Пробует по очереди все известные паттерны; возвращает ``None`` для
     нераспознанной строки (не бросает исключение — формат вывода croc
     меняется между версиями)."""
-    line = line.strip()
+    line = _ANSI_RE.sub("", line).strip()
     if not line:
         return None
     if m := CODE_RE.match(line):
+        return CodeEvent(code=m["code"])
+    if m := CODE_V11_RUN_RE.match(line):
+        return CodeEvent(code=m["code"])
+    if m := CODE_V11_URL_RE.search(line):
         return CodeEvent(code=m["code"])
     if m := TRANSFER_INIT_RE.match(line):
         return TransferStartEvent(filename=m["name"], size=m["size"])

@@ -19,12 +19,17 @@ FULL_OPTIONS = CrocOptions(
     connect="proxy.example.com:8080",
     throttle_upload="500k",
     curve="P-521",
+    transport="derp",
     hash_algo="imohash",
     no_compress=True,
     ask=True,
     auto_accept=False,
     exclude=("node_modules", ".git", "*.log"),
     transfers=8,
+    store=True,
+    store_downloads=5,
+    store_expiration="3d",
+    store_url="https://getcroc.com",
 )
 
 

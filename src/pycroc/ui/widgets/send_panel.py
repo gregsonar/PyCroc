@@ -261,7 +261,10 @@ class SendPanel(Vertical):
         size_bytes: int | None = None
         try:
             async for event in self._runner.send(paths, options):
-                if isinstance(event, CodeEvent):
+                if isinstance(event, CodeEvent) and event.code != self._current_code:
+                    # croc v11 печатает код дважды (строка-инструкция и URL) —
+                    # реагируем только на первое появление, чтобы не дублировать
+                    # уведомление и обновление QR
                     code_value = event.code
                     self._current_code = event.code
                     qr.code = event.code

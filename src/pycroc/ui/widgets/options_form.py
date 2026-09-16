@@ -56,9 +56,14 @@ class OptionsForm(Vertical):
         yield Input(placeholder="--connect http-proxy", id="opt-connect")
         yield Input(placeholder="--throttleUpload, напр. 500k", id="opt-throttle")
         yield Input(placeholder="--curve: p256 | p384 | p521 | siec | ed25519", id="opt-curve")
+        yield Input(placeholder="--transport: auto | derp | relay", id="opt-transport")
         yield Input(placeholder="--hash: xxhash | imohash | md5 (только send)", id="opt-hash")
         yield Input(placeholder="--exclude: шаблоны через запятую", id="opt-exclude")
         yield Input(placeholder="--transfers: число потоков", id="opt-transfers")
+        yield Input(placeholder="--store-downloads: число выдач", id="opt-store-downloads")
+        yield Input(placeholder="--store-expiration, напр. 3d", id="opt-store-expiration")
+        yield Input(placeholder="--store-url: сервис stored-передачи", id="opt-store-url")
+        yield Checkbox("--store: раздать группе по ссылке (только send)", id="opt-store")
         yield Checkbox("--no-compress", id="opt-no-compress")
         yield Checkbox("--ask", id="opt-ask")
         yield Checkbox("--yes (авто-подтверждение)", value=True, id="opt-auto-accept")
@@ -77,12 +82,20 @@ class OptionsForm(Vertical):
         set_text("opt-connect", options.connect)
         set_text("opt-throttle", options.throttle_upload)
         set_text("opt-curve", options.curve)
+        set_text("opt-transport", options.transport)
         set_text("opt-hash", options.hash_algo)
         set_text("opt-exclude", ",".join(options.exclude) if options.exclude else None)
         set_text(
             "opt-transfers",
             str(options.transfers) if options.transfers is not None else None,
         )
+        set_text(
+            "opt-store-downloads",
+            str(options.store_downloads) if options.store_downloads is not None else None,
+        )
+        set_text("opt-store-expiration", options.store_expiration)
+        set_text("opt-store-url", options.store_url)
+        self.query_one("#opt-store", Checkbox).value = options.store
         self.query_one("#opt-no-compress", Checkbox).value = options.no_compress
         self.query_one("#opt-ask", Checkbox).value = options.ask
         self.query_one("#opt-auto-accept", Checkbox).value = options.auto_accept
@@ -99,8 +112,10 @@ class OptionsForm(Vertical):
             if exclude_text
             else ()
         )
-        transfers_text = text("opt-transfers")
-        transfers = int(transfers_text) if transfers_text and transfers_text.isdigit() else None
+        def int_field(input_id: str) -> int | None:
+            value = text(input_id)
+            return int(value) if value and value.isdigit() else None
+
         return CrocOptions(
             code=text("opt-code"),
             pass_=text("opt-pass"),
@@ -110,10 +125,15 @@ class OptionsForm(Vertical):
             connect=text("opt-connect"),
             throttle_upload=text("opt-throttle"),
             curve=text("opt-curve"),
+            transport=text("opt-transport"),
             hash_algo=text("opt-hash"),
             no_compress=self.query_one("#opt-no-compress", Checkbox).value,
             ask=self.query_one("#opt-ask", Checkbox).value,
             auto_accept=self.query_one("#opt-auto-accept", Checkbox).value,
             exclude=exclude,
-            transfers=transfers,
+            transfers=int_field("opt-transfers"),
+            store=self.query_one("#opt-store", Checkbox).value,
+            store_downloads=int_field("opt-store-downloads"),
+            store_expiration=text("opt-store-expiration"),
+            store_url=text("opt-store-url"),
         )

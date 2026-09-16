@@ -11,19 +11,19 @@ requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "gregsonar" }]
 dependencies = [
-    "textual>=0.60",
-    "qrcode>=7.4",
+    "textual>=8.2",
+    "qrcode>=8.0",
     "tomlkit>=0.13",
     "platformdirs>=4.2",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=8.0",
-    "pytest-asyncio>=0.23",
-    "ruff>=0.6",
-    "mypy>=1.10",
-    "types-qrcode",
+    "pytest>=8.2",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.11",
+    "mypy>=1.13",
+    "types-qrcode>=8.0",
 ]
 
 [project.scripts]

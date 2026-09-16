@@ -107,3 +107,25 @@
     `builtins.list[...]` ([history.py](../src/pycroc/storage/history.py)).
 19. **`.py`-заглушку нельзя exec-нуть напрямую** (особенно на Windows):
     `CrocRunner` запускает пути с расширением `.py` через `sys.executable`.
+
+## croc v11 (проверено на реальном v11.5.0, 2026-09-08)
+
+20. **croc v11 убрал строку `Code is: <code>`.** В v10.2.7 отправитель печатал
+    `Code is: 0625-earth-python-siren`, и это ловил `CODE_RE`. В v11.5.0 такой
+    строки НЕТ — код виден только в инструкции
+    `croc <code> (code copied to clipboard)` и в URL
+    `https://getcroc.com/?code=<code>`. Без правки в обычном сценарии
+    (код генерирует croc) пользователь не увидел бы код вовсе. Решение:
+    `CODE_V11_RUN_RE` (суффикс `(code copied...)` обязателен — отличает от голой
+    инструкции старых версий) + `CODE_V11_URL_RE`
+    ([parser.py](../src/pycroc/core/parser.py)). croc печатает код дважды
+    (строка + URL, если relay дефолтный), поэтому `SendPanel` дедуплицирует
+    `CodeEvent` по значению кода. С кастомным `--relay` URL-строки нет — приходит
+    один `CodeEvent` из run-строки.
+21. **`--transport` (croc v11.3) — флаг ПОДКОМАНДЫ `send`, не глобальный.** Хотя
+    блог getcroc.com показывает `croc --transport derp send ...`, реальный
+    v11.5.0 определяет `--transport` только в `send` (это выбор ОТПРАВИТЕЛЯ). В
+    глобальной позиции croc падает: `Incorrect Usage. flag provided but not
+    defined: -transport` (exit 1). У приёма подкоманды нет, флаг к нему
+    неприменим. Поэтому `--transport` добавляется в `build_send_args` после
+    `send`, а не в `_global_args` ([options.py](../src/pycroc/core/options.py)).

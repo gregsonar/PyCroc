@@ -19,3 +19,7 @@ Sending (->10.8.1.1:42767)
 Receiving (<-127.0.0.1:42731)
 payload.bin   0% |                    | ( 0 B/524 kB) [0s:0s]
 payload.bin 100% |████████████████████| (524/524 kB, 131 MB/s)
+On the other computer, run:
+  croc move-femur-yummy (code copied to clipboard)
+Or open:
+  https://getcroc.com/?code=move-femur-yummy
