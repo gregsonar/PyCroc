@@ -31,7 +31,7 @@ croc v11.5.0 (`--transport relay`, автогенерируемый код) и �
 
 ## 0.1.0 — 2026-07-18 — initial release
 
-Первый работоспособный выпуск (MVP).
+Первый работоспособный выпуск.
 
 - TUI-приложение `pycroc` на Textual: вкладки Send / Receive / History / Settings.
 - Обёртка над бинарником croc через asyncio-subprocess: построчный разбор

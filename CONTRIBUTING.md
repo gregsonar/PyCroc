@@ -16,7 +16,7 @@
 ## Quickstart
 
 ```bash
-git clone <repo-url> && cd pycroc
+git clone https://github.com/gregsonar/PyCroc.git && cd PyCroc
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"

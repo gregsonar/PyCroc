@@ -14,3 +14,5 @@ venv/
 .idea/
 .vscode/
 tmp/
+# вынесен из репозитория, но может жить локально
+docs/style-guide/open-questions.md
