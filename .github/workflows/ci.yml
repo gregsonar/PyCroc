@@ -18,6 +18,9 @@ jobs:
   test:
     name: py${{ matrix.python-version }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    # Страховка: если тест зависнет в teardown (вне окна pytest-timeout),
+    # джоб не должен висеть по полчаса. Обычный прогон — 1-2 минуты.
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
