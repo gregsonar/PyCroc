@@ -1,4 +1,147 @@
+<a id="top"></a>
 # PyCroc
+
+**English** · [Русский](#ru)
+
+TUI client for [croc](https://github.com/schollz/croc) built on Python + [Textual](https://github.com/Textualize/textual):
+forms instead of CLI flags, a live progress bar, a QR code for the code phrase, transfer history and settings profiles.
+
+> Compatible with croc v11 (verified on v11.5.0): the `--transport` flag
+> (auto/derp/relay), stored transfers (`--store`), the new code-output format
+> (v11 dropped the `Code is:` line) and a parser resilient to colored output.
+> End-to-end transfer over a local relay verified on croc v11.5.0 and v10.2.7;
+> output formats v8/v9/v10 are still supported.
+
+## Requirements
+
+- Python 3.11+
+- An installed `croc` binary (PyCroc does not install it):
+  `choco install croc` / `scoop install croc` / [GitHub releases](https://github.com/schollz/croc/releases).
+  You can set the binary path on the Settings tab — it does not have to be on `PATH`.
+
+## Installation
+
+From source (not yet published to PyPI):
+
+```bash
+git clone https://github.com/gregsonar/PyCroc.git && cd PyCroc
+python -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+pip install .
+```
+
+For development: `pip install -e ".[dev]"`.
+
+## Running
+
+```bash
+pycroc
+```
+
+Without an installed croc the app shows a warning and disables the Send/Receive
+tabs — set the binary path in Settings and click Verify («Проверить»).
+
+## Tabs
+
+- **Send** — a file tree with checkboxes (space or a click on a file selects it),
+  the croc options form (relay, password, socks5, throttle, encryption curve,
+  transport `--transport` auto/derp/relay, exclude patterns, stored transfer
+  `--store` with a download count and lifetime, etc.; an empty field = default
+  value), send and cancel buttons. The code phrase and QR code appear right
+  after the transfer starts — the code can be copied with a button, the QR
+  scanned with a phone.
+- **Receive** — a code-phrase field with autocompletion from history (accept a
+  suggestion with the right arrow), a destination folder (`--out`), auto-confirm
+  of overwrites (`--yes`). With auto-confirm off, an overwrite conflict is shown
+  as a Yes/No modal.
+- **History** — a table of past transfers (date, file, size, direction, status)
+  with search by file name (case-insensitive, including Cyrillic). Per-row
+  actions: repeat a transfer (opens Send/Receive with the code prefilled), copy
+  the code, delete the record.
+- **Settings** — options profiles (create/edit/delete/activate; the `default`
+  profile is protected from deletion), the croc binary path with a version
+  check. The active profile provides the defaults for Send/Receive.
+
+## Keyboard shortcuts
+
+| Key | Action |
+| --- | --- |
+| `Tab` / `Shift+Tab` | next / previous field or element |
+| `↑` / `↓` | in forms — move between fields; in the tree and tables — move the cursor |
+| `Space` | mark a file/folder in the selection tree |
+| `Enter` | expand a folder in the tree; select a row |
+| `Ctrl+P` | Textual command palette |
+| `Ctrl+Q` | quit |
+
+## Configuration and profiles
+
+The config file is hand-editable (comments are preserved on write):
+
+- Windows: `%LOCALAPPDATA%\pycroc\pycroc\config.toml`
+- Linux: `~/.config/pycroc/config.toml`
+- macOS: `~/Library/Application Support/pycroc/config.toml`
+
+```toml
+active_profile = "home"
+binary_path = "C:/tools/croc.exe"   # empty / no key = "croc" from PATH
+
+[profiles.home]
+relay = "my-relay.example.com:9009" # your own relay (--relay)
+pass = "s3cret"                     # relay password or a path to a file with it
+curve = "p256"                      # p256 | p384 | p521 | siec | ed25519
+transport = "auto"                  # auto | derp | relay (croc v11.3)
+hash_algo = "xxhash"                # xxhash | imohash | md5 (send only)
+no_compress = false
+ask = false
+auto_accept = true                  # --yes and auto-answer to the overwrite prompt
+exclude = ["node_modules", ".git"]  # send only, comma-joined for croc
+transfers = 4                       # send only
+store = false                       # stored transfer, send only (croc v11.1)
+store_downloads = 1                 # download count for --store
+store_expiration = "1d"             # lifetime for --store, e.g. "3d"
+```
+
+A corrupted file does not crash the app: the default profile is used and a
+warning with the file path is shown in the UI.
+
+## Transfer history and security
+
+History is stored in SQLite:
+
+- Windows: `%LOCALAPPDATA%\pycroc\pycroc\history.db`
+- Linux: `~/.local/share/pycroc/history.db`
+
+The code phrase is passed to croc via the `CROC_SECRET` environment variable
+rather than command-line arguments — so it is not visible in the OS process list.
+
+⚠️ **Code phrases are stored in the database in plain text** — a deliberate
+decision for the "copy code" and "repeat transfer" features. The file is
+protected only by your OS user permissions. If you reuse code phrases (a
+persistent code), remember: a leak of the history file exposes working codes.
+Recommendations: do not share the DB file with third parties, delete sensitive
+records via History → Delete («Удалить»), do not reuse codes for important
+transfers.
+
+## Development
+
+```bash
+pip install -e ".[dev]"
+pytest -q
+ruff check .
+mypy src --strict
+```
+
+Integration tests use the `tests/fixtures/fake_croc.py` stub — a real croc and
+network are not required. Non-obvious gotchas are collected in
+[docs/notes.md](docs/notes.md); the development plan is
+[docs/plans/completed/pycroc-plan.md](docs/plans/completed/pycroc-plan.md).
+
+---
+
+<a id="ru"></a>
+# PyCroc · Русская версия
+
+[English](#top)
 
 TUI-клиент для [croc](https://github.com/schollz/croc) на Python + [Textual](https://github.com/Textualize/textual):
 формы вместо CLI-флагов, живой прогресс-бар, QR-код кодовой фразы, история передач и профили настроек.
