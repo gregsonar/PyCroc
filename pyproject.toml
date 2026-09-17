@@ -21,6 +21,7 @@ dependencies = [
 dev = [
     "pytest>=8.2",
     "pytest-asyncio>=0.24",
+    "pytest-timeout>=2.3",
     "ruff>=0.11",
     "mypy>=1.13",
     "types-qrcode>=8.0",
@@ -47,3 +48,9 @@ packages = ["pycroc"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+# Страховка от зависаний в CI: на Windows ProactorEventLoop (особенно py3.11)
+# отмена/закрытие subprocess-транспорта в asyncio иногда дедлочит. Таймаут
+# превращает вис в быстрый фейл, а "thread" (обязателен на Windows, где нет
+# SIGALRM) печатает стек всех потоков — видно, где именно застряло.
+timeout = 60
+timeout_method = "thread"
